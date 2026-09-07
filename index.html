@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Peminjaman Sound System</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
+<script src="https://apis.google.com/js/api.js"></script>
+<script src="https://accounts.google.com/gsi/client"></script>
+</head>
+<body>
+
+<div id="login-overlay" class="login-overlay">
+  <div class="login-box">
+    <h1>Peminjaman Sound System</h1>
+    <p>Silahkan login untuk melanjutkan.</p>
+    <label for="f-admin-user" style="text-align:left;">Username</label>
+    <input type="text" id="f-admin-user" autocomplete="off" placeholder="Username">
+    <label for="f-admin-pass" style="text-align:left;">Password</label>
+    <input type="password" id="f-admin-pass" autocomplete="off" placeholder="Password" onkeydown="if(event.key==='Enter') handleAdminLogin()">
+    <div id="login-error" class="login-error"></div>
+    <button id="btn-admin-login" onclick="handleAdminLogin()">Login</button>
+  </div>
+</div>
+
+<div id="main-shell" style="display:none;">
+
+<div class="topbar">
+ <img src="logo_diskominfo.png" alt="Logo Diskominfo" class="topbar-logo">
+  <h1>Peminjaman Sound System</h1>
+</div>
+
+<div class="shell-body">
+  <nav class="sidebar">
+    <button type="button" class="nav-item active" data-view="dashboard" onclick="switchView('dashboard')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 11L12 4L20 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10V19.5C6 20.05 6.45 20.5 7 20.5H17C17.55 20.5 18 20.05 18 19.5V10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Dashboard
+    </button>
+    <button type="button" class="nav-item" data-view="catat" onclick="switchView('catat')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M12 8V16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 12H16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span> Catat Peminjaman
+    </button>
+    <button type="button" class="nav-item" data-view="rekap" onclick="switchView('rekap')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="3.5" width="16" height="17" rx="1.5" stroke="currentColor" stroke-width="1.8"/><path d="M8 8H16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 12H16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 16H13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span> Rekap Peminjaman
+    </button>
+    <button type="button" class="nav-item" data-view="grafik" onclick="switchView('grafik')">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20V4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7.5 17V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 17V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 17V11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span> Grafik
+    </button>
+  </nav>
+
+  <div class="content-area">
+    <main>
+
+      <div id="view-dashboard" class="view">
+        <div class="panel dashboard-panel">
+          <h2>Ringkasan Dashboard</h2>
+          <div id="dashboard-stats" class="dashboard-grid">
+            <p class="empty-note">Memuat ringkasan&hellip;</p>
+          </div>
+          <div class="dash-section-title">Kegiatan 7 Hari ke Depan</div>
+          <div id="dash-upcoming-wrap">
+            <p class="empty-note">Memuat kegiatan&hellip;</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="view-catat" class="view" style="display:none;">
+        <div class="panel">
+          <h2>Catat Peminjaman Baru</h2>
+          <label for="f-suratmasuk">No.Surat Masuk</label>
+          <input type="text" id="f-suratmasuk" placeholder="">
+          <label for="f-date">Tanggal Kegiatan</label>
+          <input type="date" id="f-date">
+          <div id="status-line"></div>
+
+          <div class="row2">
+            <div>
+              <label for="f-time">Waktu Pemasangan</label>
+              <input type="time" id="f-time">
+            </div>
+            <div>
+              <label for="f-pemohon">Yang Menghadiri</label>
+              <input type="text" id="f-pemohon" placeholder="">
+            </div>
+          </div>
+
+          <label for="f-acara">Kegiatan / Acara</label>
+          <input type="text" id="f-acara" placeholder="">
+
+          <label>Jenis Kegiatan</label>
+          <div class="checkbox-row">
+            <label class="checkbox-item"><input type="checkbox" id="f-act-pasang" autocomplete="off"> Pemasangan</label>
+            <label class="checkbox-item"><input type="checkbox" id="f-act-acara" autocomplete="off"> Acara</label>
+            <label class="checkbox-item"><input type="checkbox" id="f-act-bongkar" autocomplete="off"> Pembongkaran</label>
+          </div>
+
+          <div class="row2">
+            <div>
+              <label for="f-tempat">Tempat</label>
+              <input type="text" id="f-tempat" placeholder="">
+            </div>
+            <div>
+              <label for="f-surat">No. Surat</label>
+              <input type="text" id="f-surat" placeholder="">
+            </div>
+          </div>
+
+          <button id="submit-btn" onclick="submitBooking()">Simpan Peminjaman</button>
+          <button id="cancel-edit-btn" type="button" onclick="cancelEdit()" style="display:none; background:transparent; color:var(--navy); border:1px solid var(--line); margin-left:10px;">Batal Edit</button>
+        </div>
+      </div>
+
+      <div id="view-rekap" class="view" style="display:none;">
+        <div class="panel">
+          <h2>Rekap Peminjaman</h2>
+          <div class="search-row">
+            <input type="date" id="search-date" onchange="renderTable()">
+            <button type="button" class="clear-btn" onclick="clearSearch()">Tampilkan Semua</button>
+            <button type="button" class="clear-btn" onclick="exportToExcel()">Export ke Excel</button>
+            <button type="button" class="clear-btn" id="btn-gsheets" onclick="handleOpenGoogleSheets()">Buka di Google Sheets</button>
+          </div>
+          <div id="table-wrap"><p class="empty-note">Memuat data&hellip;</p></div>
+        </div>
+      </div>
+
+      <div id="view-grafik" class="view" style="display:none;">
+        <div class="panel">
+          <h2>Grafik Jumlah Kegiatan</h2>
+          <div class="chart-toggle">
+            <button type="button" class="toggle-btn active" id="btn-harian" onclick="setChartMode('harian')">Per Tanggal</button>
+            <button type="button" class="toggle-btn" id="btn-bulanan" onclick="setChartMode('bulanan')">Per Bulan</button>
+          </div>
+          <div id="chart-wrap"><p class="empty-note">Memuat grafik&hellip;</p></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+</div>
+
+<script src="script.js?v=22"></script>
+</body>
+</html>
