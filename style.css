@@ -460,6 +460,15 @@ th{
 .stat-card.stat-red .stat-icon{background:rgba(165,52,42,0.12); color:var(--full);}
 .stat-card.stat-red .stat-value{color:var(--full);}
 
+.stat-clickable{
+  cursor:pointer;
+  transition:transform 0.15s ease, box-shadow 0.15s ease;
+}
+.stat-clickable:hover{
+  transform:translateY(-2px);
+  box-shadow:0 4px 12px rgba(0,0,0,0.1);
+}
+
 .stat-body{flex:1; min-width:0;}
 .stat-card .stat-value{
   font-size:2.4rem;
