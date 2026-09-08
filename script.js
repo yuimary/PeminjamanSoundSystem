@@ -195,7 +195,7 @@ function renderDashboard(){
 
   // Render 3 Kartu Statistik di Atas
   let statsHtml = '';
-  statsHtml += `<div class="stat-card stat-blue">
+  statsHtml += `<div class="stat-card stat-blue stat-clickable" onclick="goToMonthInRekap('${currentYM}')">
     <div class="stat-icon">${ICON_CALENDAR}</div>
     <div class="stat-body">
       <div class="stat-value">${totalBulanIni}</div>
@@ -206,7 +206,7 @@ function renderDashboard(){
     <div class="stat-icon">${ICON_ALERT}</div>
     <div class="stat-body">
       <div class="stat-value">${hariPenuh}</div>
-      <div class="stat-label">Hari sudah penuh (${LIMIT_PER_DAY}/hari)</div>
+      <div class="stat-label">Hari sudah penuh</div>
     </div>
   </div>`;
   statsHtml += `<div class="stat-card ${belumBongkar > 0 ? 'stat-red' : 'stat-green'}">
@@ -879,6 +879,20 @@ async function createAndFillGoogleSheet(){
 
 let expandedMonths = new Set(); // bulan yang sedang dibuka (format YYYY-MM)
 
+function goToMonthInRekap(ym){
+  switchView('rekap');
+  expandedMonths.add(ym);
+  renderTable();
+
+  // Kasih jeda dikit biar DOM sempat ke-render dulu sebelum scroll
+  setTimeout(() => {
+    const target = document.getElementById('month-row-' + ym);
+    if(target){
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 50);
+}
+
 function toggleMonth(ym){
   if(expandedMonths.has(ym)){
     expandedMonths.delete(ym);
@@ -926,7 +940,7 @@ function renderTable(){
     const totalInMonth = datesInMonth.reduce((sum, d) => sum + byMonth[ym][d].length, 0);
     const isOpen = expandedMonths.has(ym);
 
-    html += `<tr class="month-row" onclick="toggleMonth('${ym}')">
+    html += `<tr class="month-row" id="month-row-${ym}" onclick="toggleMonth('${ym}')">
       <td colspan="8">
         <span class="month-toggle-icon">${isOpen ? '\u25BC' : '\u25B6'}</span>
         <span class="month-label">${monthLabel}</span>
