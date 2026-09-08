@@ -112,7 +112,7 @@
         <div class="panel">
           <h2>Rekap Peminjaman</h2>
           <div class="search-row">
-            <input type="date" id="search-date" onchange="renderTable()">
+            <input type="date" id="search-date" onchange="handleSearchDateChange()">
             <button type="button" class="clear-btn" onclick="clearSearch()">Tampilkan Semua</button>
             <button type="button" class="clear-btn" onclick="exportToExcel()">Export ke Excel</button>
             <button type="button" class="clear-btn" id="btn-gsheets" onclick="handleOpenGoogleSheets()">Buka di Google Sheets</button>
@@ -137,6 +137,6 @@
 </div>
 </div>
 
-<script src="script.js?v=24"></script>
+<script src="script.js?v=31"></script>
 </body>
 </html>
