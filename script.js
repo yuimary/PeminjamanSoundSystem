@@ -194,6 +194,8 @@ function renderDashboard(){
   const belumBongkar = bookings.filter(b => b.date < todayStr && b.actBongkar === false).length;
 
   // Render 3 Kartu Statistik di Atas
+  const fullDates = Object.keys(byDateBulanIni).filter(d => byDateBulanIni[d] >= LIMIT_PER_DAY).sort();
+
   let statsHtml = '';
   statsHtml += `<div class="stat-card stat-blue stat-clickable" onclick="goToMonthInRekap('${currentYM}')">
     <div class="stat-icon">${ICON_CALENDAR}</div>
@@ -202,7 +204,7 @@ function renderDashboard(){
       <div class="stat-label">Kegiatan bulan ini</div>
     </div>
   </div>`;
-  statsHtml += `<div class="stat-card ${hariPenuh > 0 ? 'stat-red' : 'stat-green'}">
+  statsHtml += `<div class="stat-card ${hariPenuh > 0 ? 'stat-red' : 'stat-green'} ${hariPenuh > 0 ? 'stat-clickable' : ''}" ${hariPenuh > 0 ? `onclick="toggleFullDaysPanel()"` : ''}>
     <div class="stat-icon">${ICON_ALERT}</div>
     <div class="stat-body">
       <div class="stat-value">${hariPenuh}</div>
@@ -216,6 +218,25 @@ function renderDashboard(){
       <div class="stat-label">Belum dicentang "Pembongkaran"</div>
     </div>
   </div>`;
+
+  if(fullDates.length > 0){
+    statsHtml += `<div id="full-days-panel" class="full-days-panel">
+      <div class="full-days-panel-header">
+        <div class="full-days-panel-title">Tanggal yang sudah penuh bulan ini</div>
+        <button type="button" class="full-days-panel-close" onclick="event.stopPropagation(); closeFullDaysPanel()">&times;</button>
+      </div>
+      <div class="full-days-list">`;
+    fullDates.forEach(d => {
+      const dd = new Date(d + 'T00:00:00');
+      const label = dd.toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long' });
+      statsHtml += `<button type="button" class="full-day-item" onclick="event.stopPropagation(); goToDateInRekap('${d}')">
+        <span>${label}</span>
+        <span class="full-day-count">${byDateBulanIni[d]}/${LIMIT_PER_DAY}</span>
+      </button>`;
+    });
+    statsHtml += `</div></div>`;
+  }
+
   statsWrap.innerHTML = statsHtml;
 
   // Filter kegiatan 7 hari ke depan
@@ -893,6 +914,34 @@ function goToMonthInRekap(ym){
   }, 50);
 }
 
+function toggleFullDaysPanel(){
+  const panel = document.getElementById('full-days-panel');
+  if(!panel) return;
+  panel.classList.toggle('open');
+}
+
+function closeFullDaysPanel(){
+  const panel = document.getElementById('full-days-panel');
+  if(!panel) return;
+  panel.classList.remove('open');
+}
+
+function goToDateInRekap(dateStr){
+  switchView('rekap');
+  const searchInput = document.getElementById('search-date');
+  if(searchInput) searchInput.value = dateStr;
+  expandedMonths.add(dateStr.slice(0,7));
+  renderTable();
+}
+
+function handleSearchDateChange(){
+  const searchDate = document.getElementById('search-date').value;
+  if(searchDate){
+    expandedMonths.add(searchDate.slice(0,7));
+  }
+  renderTable();
+}
+
 function toggleMonth(ym){
   if(expandedMonths.has(ym)){
     expandedMonths.delete(ym);
@@ -916,11 +965,6 @@ function renderTable(){
     return;
   }
 
-  // Kalau lagi search tanggal spesifik, langsung buka bulan itu otomatis
-  if(searchDate){
-    expandedMonths.add(searchDate.slice(0,7));
-  }
-
   // Kelompokkan: bulan -> tanggal -> item
   const byMonth = {};
   filtered.forEach(b => {
@@ -940,7 +984,7 @@ function renderTable(){
     const totalInMonth = datesInMonth.reduce((sum, d) => sum + byMonth[ym][d].length, 0);
     const isOpen = expandedMonths.has(ym);
 
-    html += `<tr class="month-row" id="month-row-${ym}" onclick="toggleMonth('${ym}')">
+    html += `<tr class="month-row ${isOpen ? 'month-row-open' : ''}" id="month-row-${ym}" onclick="toggleMonth('${ym}')">
       <td colspan="8">
         <span class="month-toggle-icon">${isOpen ? '\u25BC' : '\u25B6'}</span>
         <span class="month-label">${monthLabel}</span>
@@ -953,7 +997,7 @@ function renderTable(){
       datesInMonth.forEach(date => {
         const items = byMonth[ym][date];
         const full = items.length >= LIMIT_PER_DAY;
-        html += `<tr><td colspan="8" style="background:#f6f4ee;padding-top:14px;">
+        html += `<tr><td colspan="8" style="background:#f6f4ee;padding:8px 10px;">
           <span class="datebadge">${fmtDateID(date)}</span>
           <span class="${full ? 'count-full' : 'count-ok'}">${items.length}/${LIMIT_PER_DAY} ${full ? '(PENUH)' : ''}</span>
         </td></tr>`;
