@@ -1,3 +1,32 @@
+@font-face{
+  font-family:'Inter';
+  src:url('fonts/Inter-Regular.woff2') format('woff2');
+  font-weight:400;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:'Inter';
+  src:url('fonts/Inter-Medium.woff2') format('woff2');
+  font-weight:500;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:'Inter';
+  src:url('fonts/Inter-SemiBold.woff2') format('woff2');
+  font-weight:600;
+  font-style:normal;
+  font-display:swap;
+}
+@font-face{
+  font-family:'Inter';
+  src:url('fonts/Inter-Bold.woff2') format('woff2');
+  font-weight:700;
+  font-style:normal;
+  font-display:swap;
+}
+
 :root{
   --navy:#1c3552;
   --navy-deep:#12253c;
@@ -13,7 +42,7 @@ body{
   margin:0;
   background:var(--paper);
   color:var(--ink);
- font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+ font-family: 'Inter', Roboto, Helvetica, Arial, sans-serif;
   line-height:1.5;
 }
 .topbar{
@@ -35,7 +64,7 @@ body{
   color:var(--navy);
 }
 .topbar span{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.8rem;
   color:#6b6255;
 }
@@ -45,7 +74,7 @@ main{
   padding:32px 24px 80px;
 }
 .lede{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   color:#5a5348;
   font-size:0.95rem;
   margin-bottom:28px;
@@ -59,24 +88,24 @@ main{
   margin-bottom:28px;
 }
 .panel h2{
-  font-size:1.05rem;
+  font-size:1.4rem;
   margin:0 0 18px;
   color:var(--navy);
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-weight:600;
   border-bottom:1px solid var(--line);
   padding-bottom:10px;
 }
 label{
   display:block;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.82rem;
   color:#6b6255;
   margin:14px 0 5px;
 }
 input,textarea{
   width:100%;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.92rem;
   padding:9px 11px;
   border:1px solid var(--line);
@@ -95,7 +124,7 @@ textarea{resize:vertical;min-height:60px;}
 
 #status-line{
   margin-top:16px;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.85rem;
   padding:10px 12px;
   border-radius:2px;
@@ -107,7 +136,7 @@ textarea{resize:vertical;min-height:60px;}
 
 button{
   margin-top:20px;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.92rem;
   font-weight:600;
   background:var(--navy);
@@ -124,7 +153,7 @@ button:disabled{background:#a9a297;cursor:not-allowed;}
 table{
   width:100%;
   border-collapse:collapse;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.85rem;
 }
 th,td{
@@ -151,13 +180,13 @@ th{
 .count-ok{color:var(--ok);font-weight:600;}
 .count-full{color:var(--full);font-weight:600;}
 .empty-note{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   color:#8a8172;
   font-size:0.85rem;
   padding:14px 0;
 }
 .del{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.78rem;
   color:var(--full);
   background:none;
@@ -168,7 +197,7 @@ th{
   text-decoration:underline;
 }
 .edit-btn{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.78rem;
   color:var(--navy);
   background:none;
@@ -180,7 +209,7 @@ th{
   text-decoration:underline;
 }
 .limit-note{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.8rem;
   color:#6b6255;
   margin-top:-6px;
@@ -201,7 +230,7 @@ th{
   justify-content:flex-end;
   height:100%;
   min-width:52px;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
 }
 .chart-value{
   font-size:0.78rem;
@@ -224,7 +253,7 @@ th{
   line-height:1.25;
 }
 .legend{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.78rem;
   color:#6b6255;
   margin-top:14px;
@@ -239,7 +268,7 @@ th{
   margin-bottom:16px;
 }
 .toggle-btn{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.8rem;
   background:var(--paper);
   color:var(--navy);
@@ -266,7 +295,7 @@ th{
   margin:0;
 }
 .clear-btn{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.8rem;
   background:none;
   color:var(--navy);
@@ -289,7 +318,7 @@ th{
   display:flex !important;
   align-items:center;
   gap:7px;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.88rem;
   color:var(--ink);
   margin:0 !important;
@@ -325,7 +354,7 @@ th{
   margin:0 0 10px;
 }
 .login-box p{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   color:#6b6255;
   font-size:0.88rem;
   margin:0 0 22px;
@@ -335,7 +364,7 @@ th{
   width:100%;
 }
 .login-error{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.8rem;
   color:var(--full);
   min-height:18px;
@@ -348,6 +377,28 @@ th{
   overflow-y:auto;
   border:1px solid var(--line);
   border-radius:2px;
+  scrollbar-width:thin; /* Firefox */
+  scrollbar-color:transparent transparent; /* Firefox: default disembunyikan */
+}
+.rekap-scroll.is-scrolling{
+  scrollbar-color:rgba(28,53,82,0.4) transparent; /* Firefox: muncul saat scroll */
+}
+.rekap-scroll::-webkit-scrollbar{
+  width:8px;
+}
+.rekap-scroll::-webkit-scrollbar-track{
+  background:transparent;
+}
+.rekap-scroll::-webkit-scrollbar-thumb{
+  background:transparent;
+  border-radius:8px;
+  transition:background-color 0.4s ease;
+}
+.rekap-scroll.is-scrolling::-webkit-scrollbar-thumb{
+  background-color:rgba(28,53,82,0.4);
+}
+.rekap-scroll:hover::-webkit-scrollbar-thumb{
+  background-color:rgba(28,53,82,0.25);
 }
 .rekap-scroll table{
   margin:0;
@@ -376,7 +427,6 @@ th{
 }
 .month-row-open{
   background:var(--amber) !important;
-  box-shadow:inset 5px 0 0 0 #8a5c15;
 }
 .month-row-open td{
   color:#1c1608 !important;
@@ -409,13 +459,13 @@ th{
   width:10px;
 }
 .month-label{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-weight:600;
   font-size:0.9rem;
   color:#fff;
 }
 .month-count{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.78rem;
   color:#cdd7e2;
   margin-left:10px;
@@ -451,12 +501,12 @@ th{
   color:#fff;
 }
 .dash-hero-greet{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:1.6rem;
   font-weight:700;
 }
 .dash-hero-date{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:1rem;
   color:#cdd7e2;
   margin-top:8px;
@@ -468,7 +518,6 @@ th{
   gap:18px;
   background:#fff;
   border:1px solid var(--line);
-  border-left:5px solid var(--navy);
   border-radius:10px;
   padding:24px 24px;
   box-shadow:0 1px 4px rgba(0,0,0,0.05);
@@ -485,10 +534,8 @@ th{
   color:var(--navy);
 }
 .stat-icon svg{width:30px;height:30px;}
-.stat-card.stat-blue{border-left-color:var(--navy);}
-.stat-card.stat-green{border-left-color:var(--ok);}
 .stat-card.stat-green .stat-icon{background:rgba(58,107,74,0.12); color:var(--ok);}
-.stat-card.stat-red{border-left-color:var(--full); background:#fdf4f3;}
+.stat-card.stat-red{background:#fdf4f3;}
 .stat-card.stat-red .stat-icon{background:rgba(165,52,42,0.12); color:var(--full);}
 .stat-card.stat-red .stat-value{color:var(--full);}
 
@@ -520,7 +567,7 @@ th{
   margin-bottom:12px;
 }
 .full-days-panel-title{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.82rem;
   font-weight:700;
   color:var(--full);
@@ -556,7 +603,7 @@ th{
   border-radius:6px;
   padding:10px 14px;
   margin-top:0;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.88rem;
   font-weight:600;
   color:var(--ink);
@@ -581,14 +628,14 @@ th{
   line-height:1.15;
 }
 .stat-card .stat-label{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.86rem;
   color:#6b6255;
   margin-top:4px;
 }
 
 .dash-section-title{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:1rem;
   font-weight:700;
   color:var(--navy);
@@ -603,13 +650,13 @@ th{
   gap:14px;
 }
 .upcoming-item{
-  display:flex;
-  align-items:center;
-  gap:18px;
-  background:var(--paper);
-  border:1px solid var(--line);
-  border-radius:10px;
-  padding:18px 20px;
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
 }
 .upcoming-badge{
   flex:0 0 auto;
@@ -635,14 +682,22 @@ th{
   color:#cdd7e2;
 }
 .upcoming-info{flex:1; min-width:0;}
+.upcoming-subitem{
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+}
+.upcoming-subitem:first-of-type{margin-top:8px;}
 .upcoming-title{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-weight:600;
   font-size:1.05rem;
   color:var(--ink);
 }
 .upcoming-meta{
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
   font-size:0.88rem;
   color:#6b6255;
   margin-top:4px;
@@ -652,7 +707,7 @@ th{
   text-align:center;
   padding:64px 20px;
   color:#8a8172;
-  font-family:'Segoe UI',Arial,sans-serif;
+  font-family:'Inter',Arial,sans-serif;
 }
 .dash-empty-small{padding:36px 20px;}
 .dash-empty-icon{
@@ -719,7 +774,7 @@ th{
   border-radius: 8px;
   padding: 12px 14px;
   margin-top: 0;
-  font-family: 'Segoe UI', Arial, sans-serif;
+  font-family: 'Inter', Arial, sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -777,4 +832,39 @@ th{
   .content-area main{
     padding: 24px 18px 60px;
   }
+}
+
+/* Batasi tinggi daftar kegiatan 7 hari ke depan agar ada scroll-nya */
+#dash-upcoming-wrap {
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+#dash-upcoming-wrap.is-scrolling {
+  scrollbar-color: rgba(28,53,82,0.4) transparent;
+}
+
+#dash-upcoming-wrap::-webkit-scrollbar {
+  width: 6px;
+}
+
+#dash-upcoming-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#dash-upcoming-wrap::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 6px;
+  transition: background-color 0.4s ease;
+}
+
+#dash-upcoming-wrap.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(28,53,82,0.4);
+}
+
+#dash-upcoming-wrap:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(28,53,82,0.25);
 }
