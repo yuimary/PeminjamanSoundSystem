@@ -266,9 +266,9 @@ function renderDashboard(){
       const monthShort = d.toLocaleDateString('id-ID', { month:'short' }).toUpperCase();
       const dayName = d.toLocaleDateString('id-ID', { weekday:'long' });
 
-      // Buat daftar kegiatan dalam 1 tanggal tersebut
+      // Buat daftar kegiatan dalam 1 tanggal tersebut, tiap kegiatan jadi box terpisah
       let subItemsHtml = items.map(b => `
-        <div class="upcoming-subitem" style="margin-top:6px; padding-top:6px; border-top:1px dashed var(--line);">
+        <div class="upcoming-subitem">
           <div class="upcoming-title" style="font-size:0.98rem;">${escapeHtml(b.acara)}</div>
           <div class="upcoming-meta">${b.time ? 'Jam ' + b.time : ''}${b.tempat ? ' \u2022 ' + escapeHtml(b.tempat) : ''}${b.pemohon ? ' \u2022 ' + escapeHtml(b.pemohon) : ''}</div>
         </div>
@@ -1022,6 +1022,21 @@ function renderTable(){
 
   html += '</tbody></table></div>';
   wrap.innerHTML = html;
+  setupAutoHideScrollbar();
+}
+
+// Scrollbar cuma muncul pas lagi discroll, abis itu fade lagi otomatis
+function setupAutoHideScrollbar(){
+  const scrollEl = document.querySelector('.rekap-scroll');
+  if(!scrollEl) return;
+  let hideTimer = null;
+  scrollEl.addEventListener('scroll', () => {
+    scrollEl.classList.add('is-scrolling');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      scrollEl.classList.remove('is-scrolling');
+    }, 900);
+  });
 }
 
 function escapeHtml(str){
@@ -1126,6 +1141,19 @@ function renderChartBulanan(wrap){
   }
 
   wrap.innerHTML = html;
+}
+
+function setupUpcomingScrollbar(){
+  const scrollEl = document.getElementById('dash-upcoming-wrap');
+  if(!scrollEl) return;
+  let hideTimer = null;
+  scrollEl.addEventListener('scroll', () => {
+    scrollEl.classList.add('is-scrolling');
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => {
+      scrollEl.classList.remove('is-scrolling');
+    }, 900);
+  });
 }
 
 document.getElementById('f-date').addEventListener('change', checkDateStatus);
