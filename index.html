@@ -113,9 +113,14 @@
           <h2>Rekap Peminjaman</h2>
           <div class="search-row">
             <input type="date" id="search-date" onchange="handleSearchDateChange()">
-            <button type="button" class="clear-btn" onclick="clearSearch()">Tampilkan Semua</button>
-            <button type="button" class="clear-btn" onclick="exportToExcel()">Export ke Excel</button>
-            <button type="button" class="clear-btn" id="btn-gsheets" onclick="handleOpenGoogleSheets()">Buka di Google Sheets</button>
+            <input type="text" id="search-text" placeholder="Cari nama kegiatan/tempat&hellip;" oninput="handleSearchTextChange()">
+          </div>
+          <div class="action-row">
+            <button type="button" class="clear-btn" onclick="clearSearch()">Semua Tanggal</button>
+            <button type="button" class="clear-btn" onclick="openExportModal('excel')">Excel</button>
+            <button type="button" class="clear-btn" id="btn-gsheets" onclick="openExportModal('gsheets')">Google Sheets</button>
+            <button type="button" class="clear-btn" onclick="openImportModal()">Import Data Historis</button>
+            <input type="file" id="import-historis-file" accept=".xlsx,.xls" style="display:none;" onchange="handleImportHistorisFile(event)">
           </div>
           <div id="table-wrap"><p class="empty-note">Memuat data&hellip;</p></div>
         </div>
@@ -135,6 +140,63 @@
     </main>
   </div>
 </div>
+</div>
+
+<div id="export-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>Pilih Data yang Akan Di-export</h3>
+
+    <label class="export-option">
+      <input type="radio" name="export-scope" id="scope-date" value="date" onchange="toggleRangeInputs()">
+      <span>Tanggal ini saja <span id="scope-date-label" class="export-option-note"></span></span>
+    </label>
+
+    <label class="export-option">
+      <input type="radio" name="export-scope" id="scope-range" value="range" onchange="toggleRangeInputs()">
+      <span>Rentang tanggal</span>
+    </label>
+    <div id="range-inputs" class="export-range-inputs" style="display:none;">
+      <input type="date" id="export-range-from">
+      <span>s/d</span>
+      <input type="date" id="export-range-to">
+    </div>
+
+    <label class="export-option">
+      <input type="radio" name="export-scope" id="scope-all" value="all" checked onchange="toggleRangeInputs()">
+      <span>Semua tanggal</span>
+    </label>
+
+    <div class="modal-actions">
+      <button type="button" class="clear-btn" onclick="closeExportModal()">Batal</button>
+      <button type="button" onclick="confirmExport()">Export</button>
+    </div>
+  </div>
+</div>
+
+<div id="import-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>Import Data Historis</h3>
+
+    <label class="export-option">
+      <input type="radio" name="import-source" id="import-source-file" value="file" checked onchange="toggleImportSourceInputs()">
+      <span>Upload file Excel (.xlsx)</span>
+    </label>
+
+    <label class="export-option">
+      <input type="radio" name="import-source" id="import-source-link" value="link" onchange="toggleImportSourceInputs()">
+      <span>Link Google Sheets</span>
+    </label>
+    <div id="import-link-input-wrap" style="display:none; margin-top:8px;">
+      <input type="text" id="import-gsheet-link" placeholder="Tempel link Google Sheets di sini">
+    </div>
+
+    <div id="import-status-line" class="import-status-line"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="clear-btn" onclick="closeImportModal()">Batal</button>
+      <button type="button" onclick="confirmImport()">Import</button>
+    </div>
+  </div>
 </div>
 
 <script src="script.js?v=39"></script>
