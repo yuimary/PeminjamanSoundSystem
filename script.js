@@ -364,7 +364,8 @@ function resetForm(){
   document.getElementById('submit-btn').textContent = 'Simpan Peminjaman';
   const cancelBtn = document.getElementById('cancel-edit-btn');
   if(cancelBtn) cancelBtn.style.display = 'none';
-  document.querySelector('.panel h2').textContent = 'Catat Peminjaman Baru';
+  const catatTitle = document.querySelector('#view-catat .panel h2');
+  if(catatTitle) catatTitle.textContent = 'Catat Peminjaman Baru';
   checkDateStatus();
 }
 
@@ -372,6 +373,8 @@ function startEditBooking(id){
   const b = bookings.find(x => x.id === id);
   if(!b) return;
   editingId = id;
+
+  switchView('catat');
 
   document.getElementById('f-date').value = b.date;
   document.getElementById('f-time').value = b.time || '';
@@ -387,10 +390,10 @@ function startEditBooking(id){
   document.getElementById('submit-btn').textContent = 'Update Peminjaman';
   const cancelBtn = document.getElementById('cancel-edit-btn');
   if(cancelBtn) cancelBtn.style.display = '';
-  document.querySelector('.panel h2').textContent = 'Edit Peminjaman';
+  const catatTitle = document.querySelector('#view-catat .panel h2');
+  if(catatTitle) catatTitle.textContent = 'Edit Peminjaman';
 
   checkDateStatus();
-  document.querySelector('.panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function submitBooking(){
@@ -466,11 +469,267 @@ function deleteBooking(id){
 
 function clearSearch(){
   document.getElementById('search-date').value = '';
+  document.getElementById('search-text').value = '';
   renderTable();
 }
 
 const MONTH_NAMES_FULL_ID = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const DAY_NAMES_ID = ['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+
+/* ============================================================
+   IMPORT DATA HISTORIS DARI EXCEL
+   Membaca file Excel format lama "AGENDA SOUND SYSTEM" (judul,
+   BULAN <nama> <tahun>, header NO/WAKTU/PEMASANGAN/ACARA/
+   PEMBONGKARAN/KEGIATAN/YANG MENGHADIRI/TEMPAT/NO SURAT, lalu
+   pita tanggal per kelompok kegiatan) dan memasukkan datanya ke
+   bookings, supaya histori tahun-tahun sebelumnya ikut masuk ke
+   Rekap Peminjaman & Grafik.
+   ============================================================ */
+function handleImportHistorisFile(event){
+  const file = event.target.files[0];
+  event.target.value = ''; // reset supaya file yang sama bisa dipilih lagi nanti
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, { type: 'array' });
+      const parsed = parseHistorisWorkbook(wb);
+      if(parsed.length === 0){
+        alert('Tidak ada data yang bisa dikenali dari file ini. Pastikan formatnya sesuai file AGENDA SOUND SYSTEM (ada header NO/WAKTU SESUAI SURAT/PEMASANGAN/ACARA/PEMBONGKARAN/KEGIATAN/YANG MENGHADIRI/TEMPAT/NO SURAT, dan baris tanggal per kelompok kegiatan).');
+        return;
+      }
+      importParsedBookings(parsed);
+    }catch(err){
+      console.error(err);
+      alert('Gagal membaca file: ' + (err.message || err));
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function normalizeHeaderCell(v){
+  return String(v == null ? '' : v).trim().toUpperCase();
+}
+
+function isRowBlank(row){
+  return row.every(c => String(c == null ? '' : c).trim() === '');
+}
+
+// Cari kolom-kolom penting dari 1 baris header berdasarkan TEKS-nya
+// (bukan posisi tetap), supaya toleran kalau urutan/posisi kolom
+// beda-beda antar bulan di file lama.
+function mapHeaderColumns(headerRow){
+  const map = {};
+  headerRow.forEach((cell, idx) => {
+    const t = normalizeHeaderCell(cell);
+    if(t === 'WAKTU SESUAI SURAT') map.waktu = idx;
+    else if(t === 'PEMASANGAN') map.pasang = idx;
+    else if(t === 'ACARA') map.acara = idx;
+    else if(t === 'PEMBONGKARAN') map.bongkar = idx;
+    else if(t.indexOf('KEGIATAN') !== -1) map.kegiatan = idx;
+    else if(t.indexOf('MENGHADIRI') !== -1) map.pemohon = idx;
+    else if(t === 'TEMPAT') map.tempat = idx;
+    else if(t.indexOf('NO SURAT') !== -1) map.surat = idx;
+  });
+  return map;
+}
+
+function looksLikeHeaderRow(row){
+  const norm = row.map(normalizeHeaderCell);
+  return norm.includes('NO') && norm.some(t => t.indexOf('KEGIATAN') !== -1) && norm.some(t => t === 'PEMASANGAN' || t === 'ACARA');
+}
+
+// Parse baris pita tanggal, misal "Sabtu ,6 Juni 2026" jadi ISO YYYY-MM-DD.
+// Toleran terhadap spasi/koma yang tidak konsisten. Return null kalau
+// tidak cocok pola sama sekali (dianggap bukan pita tanggal).
+function parseDayBandLabel(cellValue){
+  const s = String(cellValue == null ? '' : cellValue).trim();
+  if(!s) return null;
+  const m = s.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
+  if(!m) return null;
+  const day = parseInt(m[1], 10);
+  const monthName = m[2].toLowerCase();
+  const year = parseInt(m[3], 10);
+  const monthIdx = MONTH_NAMES_FULL_ID.findIndex(mn => mn.toLowerCase() === monthName);
+  if(monthIdx === -1 || !day || !year) return null;
+  const mm = String(monthIdx + 1).padStart(2, '0');
+  const dd = String(day).padStart(2, '0');
+  return `${year}-${mm}-${dd}`;
+}
+
+function cellHasMark(v){
+  return String(v == null ? '' : v).trim() !== '';
+}
+
+function normalizeWaktuCell(v){
+  let s = String(v == null ? '' : v).trim();
+  if(s.indexOf(':') === -1 && s.indexOf('.') !== -1){
+    s = s.replace('.', ':');
+  }
+  return s;
+}
+
+function parseHistorisWorkbook(wb){
+  const results = [];
+  wb.SheetNames.forEach(sheetName => {
+    const ws = wb.Sheets[sheetName];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    results.push(...parseHistorisRows(rows));
+  });
+  return results;
+}
+
+// Parser inti: menerima 1 sheet berupa array-of-array baris, dipakai baik
+// untuk sheet dari file Excel (via XLSX.utils.sheet_to_json) maupun dari
+// data mentah Google Sheets API (values.get -> resp.result.values).
+function parseHistorisRows(rows){
+  const results = [];
+  let colMap = null;
+  let currentDate = null;
+
+  for(let i = 0; i < rows.length; i++){
+    const row = rows[i] || [];
+    if(isRowBlank(row)) continue;
+
+    if(looksLikeHeaderRow(row)){
+      colMap = mapHeaderColumns(row);
+      continue;
+    }
+
+    const iso = parseDayBandLabel(row[0]);
+    if(iso){
+      currentDate = iso;
+      continue;
+    }
+
+    if(!currentDate || !colMap) continue;
+
+    const kegiatan = colMap.kegiatan !== undefined ? String(row[colMap.kegiatan] || '').trim() : '';
+    if(!kegiatan) continue; // baris kosong/dekorasi di tengah blok, lewati
+
+    results.push({
+      date: currentDate,
+      time: colMap.waktu !== undefined ? normalizeWaktuCell(row[colMap.waktu]) : '',
+      pemohon: colMap.pemohon !== undefined ? String(row[colMap.pemohon] || '').trim() : '',
+      acara: kegiatan,
+      tempat: colMap.tempat !== undefined ? String(row[colMap.tempat] || '').trim() : '',
+      surat: colMap.surat !== undefined ? String(row[colMap.surat] || '').trim() : '',
+      suratmasuk: '',
+      actPasang: colMap.pasang !== undefined ? cellHasMark(row[colMap.pasang]) : false,
+      actAcara: colMap.acara !== undefined ? cellHasMark(row[colMap.acara]) : false,
+      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false
+    });
+  }
+  return results;
+}
+
+/* ============================================================
+   MODAL PILIHAN SUMBER IMPORT: file Excel atau link Google Sheets
+   ============================================================ */
+function openImportModal(){
+  document.getElementById('import-source-file').checked = true;
+  document.getElementById('import-gsheet-link').value = '';
+  const statusLine = document.getElementById('import-status-line');
+  statusLine.textContent = '';
+  statusLine.style.color = 'var(--ink)';
+  toggleImportSourceInputs();
+  document.getElementById('import-modal-overlay').style.display = 'flex';
+}
+
+function closeImportModal(){
+  document.getElementById('import-modal-overlay').style.display = 'none';
+}
+
+function toggleImportSourceInputs(){
+  const isLink = document.getElementById('import-source-link').checked;
+  document.getElementById('import-link-input-wrap').style.display = isLink ? '' : 'none';
+}
+
+function confirmImport(){
+  const isLink = document.getElementById('import-source-link').checked;
+  if(isLink){
+    importFromGoogleSheetsLink();
+  }else{
+    closeImportModal();
+    document.getElementById('import-historis-file').click();
+  }
+}
+
+function extractSpreadsheetId(url){
+  const m = String(url || '').match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : null;
+}
+
+async function importFromGoogleSheetsLink(){
+  const url = document.getElementById('import-gsheet-link').value.trim();
+  const statusLine = document.getElementById('import-status-line');
+  const spreadsheetId = extractSpreadsheetId(url);
+
+  if(!spreadsheetId){
+    statusLine.style.color = 'var(--full)';
+    statusLine.textContent = 'Link tidak valid. Pastikan formatnya seperti https://docs.google.com/spreadsheets/d/.../edit';
+    return;
+  }
+
+  statusLine.style.color = 'var(--ink)';
+  statusLine.textContent = 'Menghubungkan ke Google...';
+
+  try{
+    await requestGoogleAccess();
+    statusLine.textContent = 'Membaca isi spreadsheet...';
+
+    const meta = await gapi.client.sheets.spreadsheets.get({ spreadsheetId });
+    const sheetTitles = meta.result.sheets.map(s => s.properties.title);
+
+    let allParsed = [];
+    for(const title of sheetTitles){
+      const resp = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${title.replace(/'/g, "''")}'`
+      });
+      allParsed = allParsed.concat(parseHistorisRows(resp.result.values || []));
+    }
+
+    if(allParsed.length === 0){
+      statusLine.style.color = 'var(--full)';
+      statusLine.textContent = 'Tidak ada data yang bisa dikenali dari spreadsheet ini. Pastikan formatnya sesuai file AGENDA SOUND SYSTEM.';
+      return;
+    }
+
+    closeImportModal();
+    importParsedBookings(allParsed);
+  }catch(err){
+    console.error(err);
+    statusLine.style.color = 'var(--full)';
+    statusLine.textContent = 'Gagal membaca Google Sheets: ' + (err.result?.error?.message || err.message || err);
+  }
+}
+
+
+// Data histori tidak divalidasi terhadap limit 3/hari (itu aturan untuk
+// input baru, bukan untuk memindahkan catatan lama apa adanya).
+// Hanya dicek duplikat terhadap booking yang sudah ada, supaya file yang
+// sama bisa diimpor ulang tanpa menggandakan data.
+function importParsedBookings(parsedList){
+  let added = 0, skipped = 0;
+  parsedList.forEach(p => {
+    const dup = bookings.find(b =>
+      b.date === p.date &&
+      (b.time || '') === (p.time || '') &&
+      String(b.acara || '').trim().toLowerCase() === p.acara.trim().toLowerCase()
+    );
+    if(dup){ skipped++; return; }
+    bookings.push({ id: 'bk_import_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), ...p });
+    added++;
+  });
+  saveBookings();
+  renderTable();
+  renderChart();
+  renderDashboard();
+  alert(`Import selesai.\nBerhasil ditambahkan: ${added} kegiatan.\nDilewati (sudah ada/duplikat): ${skipped} kegiatan.`);
+}
 
 function styleTitle(){
   return { font: { bold: true, sz: 16 }, alignment: { horizontal: 'center', vertical: 'center' } };
@@ -695,12 +954,84 @@ function writeAgendaWorkbook(data, filename, sheetName){
   XLSX.writeFile(wb, filename);
 }
 
-function exportToExcel(){
-  if(bookings.length === 0){
+let pendingExportType = null; // 'excel' atau 'gsheets', dipakai modal pilihan export
+
+function openExportModal(type){
+  pendingExportType = type;
+  const searchDate = document.getElementById('search-date').value;
+  const scopeDateRadio = document.getElementById('scope-date');
+  const scopeDateLabel = document.getElementById('scope-date-label');
+
+  if(searchDate){
+    scopeDateRadio.disabled = false;
+    scopeDateLabel.textContent = `(${fmtDateID(searchDate)})`;
+    scopeDateRadio.checked = true;
+  }else{
+    scopeDateRadio.disabled = true;
+    scopeDateLabel.textContent = '(belum ada tanggal dipilih di pencarian)';
+    document.getElementById('scope-all').checked = true;
+  }
+
+  document.getElementById('export-range-from').value = '';
+  document.getElementById('export-range-to').value = '';
+  toggleRangeInputs();
+
+  document.getElementById('export-modal-overlay').style.display = 'flex';
+}
+
+function closeExportModal(){
+  document.getElementById('export-modal-overlay').style.display = 'none';
+}
+
+function toggleRangeInputs(){
+  const isRange = document.getElementById('scope-range').checked;
+  document.getElementById('range-inputs').style.display = isRange ? '' : 'none';
+}
+
+function confirmExport(){
+  const scope = document.querySelector('input[name="export-scope"]:checked').value;
+  let subset;
+
+  if(scope === 'date'){
+    const d = document.getElementById('search-date').value;
+    subset = bookings.filter(b => b.date === d);
+  }else if(scope === 'range'){
+    const from = document.getElementById('export-range-from').value;
+    const to = document.getElementById('export-range-to').value;
+    if(!from || !to){
+      alert('Isi tanggal "dari" dan "sampai" dulu.');
+      return;
+    }
+    if(from > to){
+      alert('Tanggal awal harus sebelum atau sama dengan tanggal akhir.');
+      return;
+    }
+    subset = bookings.filter(b => b.date >= from && b.date <= to);
+  }else{
+    subset = bookings;
+  }
+
+  if(subset.length === 0){
+    alert('Tidak ada data pada tanggal/rentang yang dipilih.');
+    return;
+  }
+
+  closeExportModal();
+
+  if(pendingExportType === 'excel'){
+    exportToExcel(subset);
+  }else if(pendingExportType === 'gsheets'){
+    handleOpenGoogleSheets(subset);
+  }
+}
+
+function exportToExcel(subset){
+  const source = subset || bookings;
+  if(source.length === 0){
     alert('Belum ada data untuk di-export.');
     return;
   }
-  const data = buildAgendaData(bookings);
+  const data = buildAgendaData(source);
   const today = new Date().toISOString().slice(0,10);
   writeAgendaWorkbook(data, `agenda-sound-system-${today}.xlsx`, 'Agenda Sound System');
 }
@@ -734,8 +1065,9 @@ function rgbToGoogleColor(hex){
   return { red: r, green: g, blue: b };
 }
 
-function handleOpenGoogleSheets(){
-  if(bookings.length === 0){
+function handleOpenGoogleSheets(subset){
+  const source = subset || bookings;
+  if(source.length === 0){
     alert('Belum ada data untuk dikirim ke Google Sheets.');
     return;
   }
@@ -748,7 +1080,7 @@ function handleOpenGoogleSheets(){
     .then(() => {
       btn.textContent = originalLabel;
       btn.disabled = false;
-      createAndFillGoogleSheet().catch(err => {
+      createAndFillGoogleSheet(source).catch(err => {
         console.error(err);
         alert('Gagal membuat Google Sheets: ' + (err.result?.error?.message || err.message || err));
       });
@@ -760,14 +1092,14 @@ function handleOpenGoogleSheets(){
     });
 }
 
-async function createAndFillGoogleSheet(){
+async function createAndFillGoogleSheet(subset){
   const btn = document.getElementById('btn-gsheets');
   const originalLabel = btn.textContent;
   btn.disabled = true;
   btn.textContent = 'Membuat Google Sheets...';
 
   try{
-    const data = buildAgendaData();
+    const data = buildAgendaData(subset || bookings);
     const today = new Date().toISOString().slice(0,10);
 
     // 1. Buat spreadsheet baru
@@ -942,6 +1274,22 @@ function handleSearchDateChange(){
   renderTable();
 }
 
+let searchTextDebounce = null;
+function handleSearchTextChange(){
+  clearTimeout(searchTextDebounce);
+  searchTextDebounce = setTimeout(() => {
+    const q = document.getElementById('search-text').value.trim().toLowerCase();
+    if(q){
+      // Buka otomatis semua bulan yang hasilnya cocok, biar langsung kelihatan
+      bookings.forEach(b => {
+        const cocok = (b.acara || '').toLowerCase().includes(q) || (b.tempat || '').toLowerCase().includes(q);
+        if(cocok) expandedMonths.add(b.date.slice(0,7));
+      });
+    }
+    renderTable();
+  }, 300);
+}
+
 function toggleMonth(ym){
   if(expandedMonths.has(ym)){
     expandedMonths.delete(ym);
@@ -954,14 +1302,28 @@ function toggleMonth(ym){
 function renderTable(){
   const wrap = document.getElementById('table-wrap');
   const searchDate = document.getElementById('search-date').value;
-  const filtered = searchDate ? bookings.filter(b => b.date === searchDate) : bookings;
+  const searchText = document.getElementById('search-text').value.trim().toLowerCase();
+
+  let filtered = bookings;
+  if(searchDate){
+    filtered = filtered.filter(b => b.date === searchDate);
+  }
+  if(searchText){
+    filtered = filtered.filter(b =>
+      (b.acara || '').toLowerCase().includes(searchText) ||
+      (b.tempat || '').toLowerCase().includes(searchText)
+    );
+  }
 
   if(bookings.length === 0){
     wrap.innerHTML = '<p class="empty-note">Belum ada data peminjaman.</p>';
     return;
   }
-  if(searchDate && filtered.length === 0){
-    wrap.innerHTML = `<p class="empty-note">Tidak ada peminjaman di tanggal ${fmtDateID(searchDate)}.</p>`;
+  if((searchDate || searchText) && filtered.length === 0){
+    let pesan = 'Tidak ada peminjaman';
+    if(searchDate) pesan += ` di tanggal ${fmtDateID(searchDate)}`;
+    if(searchText) pesan += `${searchDate ? ' dan' : ' dengan'} kata kunci "${escapeHtml(document.getElementById('search-text').value.trim())}"`;
+    wrap.innerHTML = `<p class="empty-note">${pesan}.</p>`;
     return;
   }
 
