@@ -288,11 +288,27 @@ th{
   display:flex;
   gap:10px;
   align-items:center;
-  margin-bottom:18px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
 }
 .search-row input[type="date"]{
   max-width:200px;
   margin:0;
+}
+.search-row input[type="text"]{
+  flex:1;
+  min-width:200px;
+  max-width:320px;
+  margin:0;
+}
+.action-row{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  flex-wrap:wrap;
+  margin-bottom:18px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
 }
 .clear-btn{
   font-family:'Inter',Arial,sans-serif;
@@ -370,6 +386,86 @@ th{
   min-height:18px;
   margin-top:6px;
   text-align:left;
+}
+
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(18,37,60,0.55);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:1000;
+  padding:20px;
+}
+.modal-box{
+  background:#fff;
+  border-radius:8px;
+  padding:28px 30px;
+  max-width:400px;
+  width:100%;
+  box-shadow:0 10px 40px rgba(0,0,0,0.25);
+}
+.modal-box h3{
+  font-size:1.05rem;
+  color:var(--navy);
+  margin:0 0 18px;
+  font-family:'Inter',Arial,sans-serif;
+  font-weight:600;
+}
+.export-option{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 4px;
+  cursor:pointer;
+  font-family:'Inter',Arial,sans-serif;
+  font-size:0.9rem;
+  color:var(--ink);
+}
+.export-option input[type="radio"]{
+  width:16px;
+  height:16px;
+  accent-color:var(--navy);
+  cursor:pointer;
+}
+.export-option-note{
+  font-size:0.8rem;
+  color:#6b6255;
+  font-weight:400;
+}
+.export-range-inputs{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:4px 4px 4px 30px;
+  margin-bottom:4px;
+}
+.export-range-inputs input[type="date"]{
+  margin:0;
+  font-size:0.85rem;
+  padding:7px 9px;
+}
+.export-range-inputs span{
+  font-family:'Inter',Arial,sans-serif;
+  font-size:0.82rem;
+  color:#6b6255;
+}
+.import-status-line{
+  font-family:'Inter',Arial,sans-serif;
+  font-size:0.82rem;
+  color:var(--ink);
+  min-height:18px;
+  margin-top:10px;
+}
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:20px;
+}
+.modal-actions button{
+  margin-top:0;
 }
 
 .rekap-scroll{
@@ -858,7 +954,7 @@ th{
 #dash-upcoming-wrap::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 6px;
-  transition: background-color 0.4s ease;
+  transition: background-color 0.4s ease;a
 }
 
 #dash-upcoming-wrap.is-scrolling::-webkit-scrollbar-thumb {
