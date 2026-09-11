@@ -55,6 +55,9 @@ body{
   flex-wrap:wrap;
   gap:14px;
   border-bottom:3px solid var(--amber);
+  position:sticky;
+  top:0;
+  z-index:20;
 }
 .topbar h1{
   font-size:1.35rem;
@@ -853,9 +856,9 @@ th{
   flex-direction: column;
   gap: 4px;
   position: sticky;
-  top: 0;
+  top: 81px;
   align-self: flex-start;
-  height: 100vh;
+  height: calc(100vh - 81px);
   overflow-y: auto;
 }
 .nav-item{
@@ -954,7 +957,7 @@ th{
 #dash-upcoming-wrap::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 6px;
-  transition: background-color 0.4s ease;a
+  transition: background-color 0.4s ease;
 }
 
 #dash-upcoming-wrap.is-scrolling::-webkit-scrollbar-thumb {
