@@ -1,41 +1,137 @@
 const LIMIT_PER_DAY = 3;
-const STORAGE_KEY = 'sound_system_bookings';
 let bookings = [];
 let chartMode = 'harian';
 
 /* ============================================================
-   LOGIN ADMIN (biasa, bukan Google)
-   Catatan: karena ini murni web statis (tanpa server backend),
-   username/password ini disimpan di kode JS dan HANYA berfungsi
-   sebagai gerbang sederhana, BUKAN keamanan sungguhan (orang yang
-   paham bisa lihat lewat "View Source"). Ganti sesuai kebutuhan.
+   FIREBASE: inisialisasi Auth (login) + Firestore (database)
    ============================================================ */
-const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'sound2026'
+const firebaseConfig = {
+  apiKey: "AIzaSyB87QOIO4_HD3MGKxoD31fCT7OT_F8oHM8",
+  authDomain: "peminjaman-sound-system-33041.firebaseapp.com",
+  projectId: "peminjaman-sound-system-33041",
+  storageBucket: "peminjaman-sound-system-33041.firebasestorage.app",
+  messagingSenderId: "94049502443",
+  appId: "1:94049502443:web:bcfe5831198750668daaae"
 };
-const LOGIN_SESSION_KEY = 'sound_system_admin_logged_in';
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const bookingsCol = db.collection('bookings');
+
+let bookingsUnsubscribe = null;
+let migrationChecked = false;
+
+function translateFirebaseAuthError(code){
+  const map = {
+    'auth/invalid-email': 'Format email tidak valid.',
+    'auth/user-not-found': 'Email tidak terdaftar.',
+    'auth/wrong-password': 'Password salah.',
+    'auth/invalid-credential': 'Email atau password salah.',
+    'auth/too-many-requests': 'Terlalu banyak percobaan gagal. Coba lagi beberapa saat.',
+    'auth/network-request-failed': 'Koneksi internet bermasalah.'
+  };
+  return map[code] || ('Terjadi kesalahan (' + code + ').');
+}
 
 function handleAdminLogin(){
-  const user = document.getElementById('f-admin-user').value.trim();
+  const email = document.getElementById('f-admin-user').value.trim();
   const pass = document.getElementById('f-admin-pass').value;
   const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('btn-admin-login');
 
-  if(user === ADMIN_CREDENTIALS.username && pass === ADMIN_CREDENTIALS.password){
-    errEl.textContent = '';
-    sessionStorage.setItem(LOGIN_SESSION_KEY, 'true');
+  if(!email || !pass){
+    errEl.textContent = 'Email dan password wajib diisi.';
+    return;
+  }
+
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Memproses...';
+
+  auth.signInWithEmailAndPassword(email, pass)
+    .catch(err => {
+      console.error(err);
+      errEl.textContent = translateFirebaseAuthError(err.code);
+    })
+    .finally(() => {
+      btn.disabled = false;
+      btn.textContent = 'Login';
+    });
+}
+
+function handleLogout(){
+  auth.signOut();
+}
+
+// Satu-satunya sumber kebenaran soal status login: dipicu Firebase
+// setiap kali status auth berubah (login, logout, atau sesi dipulihkan
+// otomatis saat reload halaman).
+auth.onAuthStateChanged(user => {
+  if(user){
     document.getElementById('login-overlay').style.display = 'none';
     document.getElementById('main-shell').style.display = '';
     switchView('dashboard');
+    startBookingsListener();
   }else{
-    errEl.textContent = 'Username atau password salah.';
+    document.getElementById('login-overlay').style.display = '';
+    document.getElementById('main-shell').style.display = 'none';
+    if(bookingsUnsubscribe){ bookingsUnsubscribe(); bookingsUnsubscribe = null; }
+    bookings = [];
   }
+});
+
+// Dengarkan perubahan data booking secara real-time dari Firestore.
+// Begitu ada perubahan (dari device mana pun), tabel/grafik/dashboard
+// otomatis ke-render ulang tanpa perlu refresh halaman.
+function startBookingsListener(){
+  if(bookingsUnsubscribe) return; // sudah jalan, jangan dobel
+  bookingsUnsubscribe = bookingsCol.onSnapshot(async snapshot => {
+    bookings = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    if(bookings.length === 0 && !migrationChecked){
+      migrationChecked = true;
+      await maybeMigrateOldLocalData();
+    }
+
+    renderTable();
+    renderChart();
+    renderDashboard();
+    checkDateStatus();
+  }, err => {
+    console.error(err);
+    alert('Gagal memuat data dari database: ' + err.message);
+  });
 }
 
-function checkAdminSession(){
-  if(sessionStorage.getItem(LOGIN_SESSION_KEY) === 'true'){
-    document.getElementById('login-overlay').style.display = 'none';
-    document.getElementById('main-shell').style.display = '';
+// Migrasi sekali jalan: kalau browser ini masih menyimpan data lama di
+// localStorage (dari sebelum pindah ke database) dan Firestore-nya masih
+// kosong, tawarkan untuk memindahkan datanya supaya tidak hilang.
+const OLD_LOCAL_STORAGE_KEY = 'sound_system_bookings';
+async function maybeMigrateOldLocalData(){
+  let old = [];
+  try{
+    const raw = localStorage.getItem(OLD_LOCAL_STORAGE_KEY);
+    old = raw ? JSON.parse(raw) : [];
+  }catch(e){ old = []; }
+  if(!old || old.length === 0) return;
+
+  const ok = confirm(`Ditemukan ${old.length} data peminjaman lama tersimpan di browser ini (dari sebelum pakai database). Mau dipindahkan otomatis ke database sekarang?`);
+  if(!ok) return;
+
+  const CHUNK = 400;
+  try{
+    for(let i = 0; i < old.length; i += CHUNK){
+      const batch = db.batch();
+      old.slice(i, i + CHUNK).forEach(b => {
+        const { id, ...rest } = b;
+        batch.set(bookingsCol.doc(), rest);
+      });
+      await batch.commit();
+    }
+    alert(`Berhasil memindahkan ${old.length} data lama ke database.`);
+  }catch(err){
+    console.error(err);
+    alert('Gagal memindahkan data lama: ' + err.message);
   }
 }
 
@@ -94,7 +190,14 @@ async function initializeGapiClient(){
 }
 
 window.onload = function(){
-  checkAdminSession();
+  // Reset checkbox jenis kegiatan biar tidak ke-restore otomatis oleh
+  // browser (bfcache/form restore) saat halaman dimuat ulang.
+  const pasangEl = document.getElementById('f-act-pasang');
+  const acaraEl = document.getElementById('f-act-acara');
+  const bongkarEl = document.getElementById('f-act-bongkar');
+  if(pasangEl) pasangEl.checked = false;
+  if(acaraEl) acaraEl.checked = false;
+  if(bongkarEl) bongkarEl.checked = false;
 
   if(typeof gapi !== 'undefined') gapiLoaded();
   if(typeof google !== 'undefined' && google.accounts){
@@ -105,7 +208,8 @@ window.onload = function(){
     });
     gisInited = true;
   }
-  loadBookings();
+  // Data booking sekarang dimuat lewat startBookingsListener(), yang
+  // dipicu otomatis oleh auth.onAuthStateChanged() setelah user login.
 };
 
 // Meminta login/izin Google HANYA saat dipanggil (misal saat klik "Buka di Google Sheets").
@@ -141,29 +245,6 @@ function fmtDateID(iso){
   if(!iso) return '';
   const d = new Date(iso + 'T00:00:00');
   return d.toLocaleDateString('id-ID', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
-}
-
-function loadBookings(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    bookings = raw ? JSON.parse(raw) : [];
-  }catch(e){
-    console.error('Gagal memuat data', e);
-    bookings = [];
-  }
-  // Paksa checkbox jenis kegiatan kosong saat halaman dimuat,
-  // supaya tidak ke-restore otomatis oleh browser (bfcache/form restore)
-  const pasangEl = document.getElementById('f-act-pasang');
-  const acaraEl = document.getElementById('f-act-acara');
-  const bongkarEl = document.getElementById('f-act-bongkar');
-  if(pasangEl) pasangEl.checked = false;
-  if(acaraEl) acaraEl.checked = false;
-  if(bongkarEl) bongkarEl.checked = false;
-
-  renderTable();
-  renderChart();
-  renderDashboard();
-  checkDateStatus();
 }
 
 function renderDashboard(){
@@ -300,15 +381,6 @@ const ICON_ALERT = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.or
 const ICON_WRENCH = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 005.4-5.4l-2.5 2.5-2.6-.6-.6-2.6 2.6-2.6Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
 const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.5L10.8 15.3L16 9.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
-function saveBookings(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-  }catch(e){
-    console.error('Gagal menyimpan', e);
-    alert('Gagal menyimpan data. Storage browser mungkin penuh.');
-  }
-}
-
 function countForDate(dateStr){
   return bookings.filter(b => b.date === dateStr).length;
 }
@@ -396,7 +468,7 @@ function startEditBooking(id){
   checkDateStatus();
 }
 
-function submitBooking(){
+async function submitBooking(){
   const date = document.getElementById('f-date').value;
   const time = document.getElementById('f-time').value;
   const pemohon = document.getElementById('f-pemohon').value.trim();
@@ -432,25 +504,26 @@ function submitBooking(){
     }
   }
 
-  if(editingId){
-    // Mode update: cari dan timpa data lama
-    const idx = bookings.findIndex(b => b.id === editingId);
-    if(idx !== -1){
-      bookings[idx] = { ...bookings[idx], date, time, pemohon, acara, tempat, surat, suratmasuk, actPasang, actAcara, actBongkar };
+  const payload = { date, time, pemohon, acara, tempat, surat, suratmasuk, actPasang, actAcara, actBongkar };
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+
+  try{
+    if(editingId){
+      await bookingsCol.doc(editingId).update(payload);
+    }else{
+      await bookingsCol.add(payload);
     }
-  }else{
-    // Mode tambah baru
-    bookings.push({
-      id: 'bk_' + Date.now(),
-      date, time, pemohon, acara, tempat, surat, suratmasuk,
-      actPasang, actAcara, actBongkar
-    });
+    resetForm();
+    // Tidak perlu panggil renderTable/renderChart/renderDashboard manual di
+    // sini -- listener Firestore (onSnapshot) otomatis re-render begitu
+    // datanya berubah, dari device mana pun.
+  }catch(err){
+    console.error(err);
+    alert('Gagal menyimpan ke database: ' + err.message);
+  }finally{
+    btn.disabled = false;
   }
-  saveBookings();
-  resetForm();
-  renderTable();
-  renderChart();
-  renderDashboard();
 }
 
 function cancelEdit(){
@@ -458,13 +531,11 @@ function cancelEdit(){
 }
 
 function deleteBooking(id){
-  bookings = bookings.filter(b => b.id !== id);
-  saveBookings();
+  bookingsCol.doc(id).delete().catch(err => {
+    console.error(err);
+    alert('Gagal menghapus dari database: ' + err.message);
+  });
   if(editingId === id) resetForm(); // kalau yang lagi diedit dihapus, keluar dari mode edit
-  renderTable();
-  renderChart();
-  renderDashboard();
-  checkDateStatus();
 }
 
 function clearSearch(){
@@ -712,23 +783,32 @@ async function importFromGoogleSheetsLink(){
 // input baru, bukan untuk memindahkan catatan lama apa adanya).
 // Hanya dicek duplikat terhadap booking yang sudah ada, supaya file yang
 // sama bisa diimpor ulang tanpa menggandakan data.
-function importParsedBookings(parsedList){
-  let added = 0, skipped = 0;
+async function importParsedBookings(parsedList){
+  let skipped = 0;
+  const toAdd = [];
   parsedList.forEach(p => {
     const dup = bookings.find(b =>
       b.date === p.date &&
       (b.time || '') === (p.time || '') &&
       String(b.acara || '').trim().toLowerCase() === p.acara.trim().toLowerCase()
     );
-    if(dup){ skipped++; return; }
-    bookings.push({ id: 'bk_import_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8), ...p });
-    added++;
+    if(dup){ skipped++; }else{ toAdd.push(p); }
   });
-  saveBookings();
-  renderTable();
-  renderChart();
-  renderDashboard();
-  alert(`Import selesai.\nBerhasil ditambahkan: ${added} kegiatan.\nDilewati (sudah ada/duplikat): ${skipped} kegiatan.`);
+
+  const CHUNK = 400; // batas aman per batch Firestore (maksimal 500)
+  try{
+    for(let i = 0; i < toAdd.length; i += CHUNK){
+      const batch = db.batch();
+      toAdd.slice(i, i + CHUNK).forEach(p => {
+        batch.set(bookingsCol.doc(), p);
+      });
+      await batch.commit();
+    }
+    alert(`Import selesai.\nBerhasil ditambahkan: ${toAdd.length} kegiatan.\nDilewati (sudah ada/duplikat): ${skipped} kegiatan.`);
+  }catch(err){
+    console.error(err);
+    alert('Gagal mengimpor ke database: ' + err.message);
+  }
 }
 
 function styleTitle(){
