@@ -7,6 +7,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js"></script>
 </head>
 <body>
 
@@ -14,8 +17,8 @@
   <div class="login-box">
     <h1>Peminjaman Sound System</h1>
     <p>Silahkan login untuk melanjutkan.</p>
-    <label for="f-admin-user" style="text-align:left;">Username</label>
-    <input type="text" id="f-admin-user" autocomplete="off" placeholder="Username">
+    <label for="f-admin-user" style="text-align:left;">Email</label>
+    <input type="email" id="f-admin-user" autocomplete="off" placeholder="Email">
     <label for="f-admin-pass" style="text-align:left;">Password</label>
     <input type="password" id="f-admin-pass" autocomplete="off" placeholder="Password" onkeydown="if(event.key==='Enter') handleAdminLogin()">
     <div id="login-error" class="login-error"></div>
@@ -43,6 +46,9 @@
     </button>
     <button type="button" class="nav-item" data-view="grafik" onclick="switchView('grafik')">
       <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 20V4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 20H20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7.5 17V13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 17V9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 17V11.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></span> Grafik
+    </button>
+    <button type="button" class="nav-item" id="btn-logout" onclick="handleLogout()" style="margin-top:auto;">
+      <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M15 17.5L20 12L15 6.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 20H5.5C4.67 20 4 19.33 4 18.5V5.5C4 4.67 4.67 4 5.5 4H9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span> Logout
     </button>
   </nav>
 
@@ -199,6 +205,6 @@
   </div>
 </div>
 
-<script src="script.js?v=39"></script>
+<script src="script.js?v=40"></script>
 </body>
 </html>
