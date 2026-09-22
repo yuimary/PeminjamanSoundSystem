@@ -106,7 +106,7 @@ label{
   color:#6b6255;
   margin:14px 0 5px;
 }
-input,textarea{
+input,textarea,select{
   width:100%;
   font-family:'Inter',Arial,sans-serif;
   font-size:0.92rem;
@@ -116,7 +116,7 @@ input,textarea{
   background:var(--paper);
   color:var(--ink);
 }
-input:focus,textarea:focus{
+input:focus,textarea:focus,select:focus{
   outline:none;
   border-color:var(--navy);
   background:#fff;
@@ -967,3 +967,19 @@ th{
 #dash-upcoming-wrap:hover::-webkit-scrollbar-thumb {
   background-color: rgba(28,53,82,0.25);
 }
+/* Dropdown Status inline di tabel Rekap (Proses/Selesai/Batal) */
+.status-select{
+  width:auto;
+  font-family:'Inter',Arial,sans-serif;
+  font-size:0.76rem;
+  font-weight:600;
+  padding:4px 8px;
+  border-radius:14px;
+  border:1px solid transparent;
+  cursor:pointer;
+  color:#fff;
+}
+.status-select:focus{ outline:none; }
+.status-select.status-Proses{ background:#c8862b; }
+.status-select.status-Selesai{ background:#3a6b4a; }
+.status-select.status-Batal{ background:#a5342a; }
