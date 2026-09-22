@@ -272,7 +272,6 @@ function renderDashboard(){
     byDateBulanIni[b.date] = (byDateBulanIni[b.date] || 0) + 1;
   });
   const hariPenuh = Object.values(byDateBulanIni).filter(c => c >= LIMIT_PER_DAY).length;
-  const belumBongkar = bookings.filter(b => b.date < todayStr && b.actBongkar === false).length;
 
   // Render 3 Kartu Statistik di Atas
   const fullDates = Object.keys(byDateBulanIni).filter(d => byDateBulanIni[d] >= LIMIT_PER_DAY).sort();
@@ -290,13 +289,6 @@ function renderDashboard(){
     <div class="stat-body">
       <div class="stat-value">${hariPenuh}</div>
       <div class="stat-label">Hari sudah penuh</div>
-    </div>
-  </div>`;
-  statsHtml += `<div class="stat-card ${belumBongkar > 0 ? 'stat-red' : 'stat-green'}">
-    <div class="stat-icon">${ICON_WRENCH}</div>
-    <div class="stat-body">
-      <div class="stat-value">${belumBongkar}</div>
-      <div class="stat-label">Belum dicentang "Pembongkaran"</div>
     </div>
   </div>`;
 
@@ -433,6 +425,7 @@ function resetForm(){
   document.getElementById('f-act-pasang').checked = false;
   document.getElementById('f-act-acara').checked = false;
   document.getElementById('f-act-bongkar').checked = false;
+  document.getElementById('f-status').value = 'Proses';
   document.getElementById('submit-btn').textContent = 'Simpan Peminjaman';
   const cancelBtn = document.getElementById('cancel-edit-btn');
   if(cancelBtn) cancelBtn.style.display = 'none';
@@ -458,6 +451,7 @@ function startEditBooking(id){
   document.getElementById('f-act-pasang').checked = b.actPasang !== false;
   document.getElementById('f-act-acara').checked = b.actAcara !== false;
   document.getElementById('f-act-bongkar').checked = b.actBongkar !== false;
+  document.getElementById('f-status').value = b.status || 'Proses';
 
   document.getElementById('submit-btn').textContent = 'Update Peminjaman';
   const cancelBtn = document.getElementById('cancel-edit-btn');
@@ -479,6 +473,7 @@ async function submitBooking(){
   const actPasang = document.getElementById('f-act-pasang').checked;
   const actAcara = document.getElementById('f-act-acara').checked;
   const actBongkar = document.getElementById('f-act-bongkar').checked;
+  const status = document.getElementById('f-status').value;
 
   if(!date || !acara){
     alert('Tanggal dan Kegiatan/Acara wajib diisi.');
@@ -504,7 +499,7 @@ async function submitBooking(){
     }
   }
 
-  const payload = { date, time, pemohon, acara, tempat, surat, suratmasuk, actPasang, actAcara, actBongkar };
+  const payload = { date, time, pemohon, acara, tempat, surat, suratmasuk, actPasang, actAcara, actBongkar, status };
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
 
@@ -536,6 +531,14 @@ function deleteBooking(id){
     alert('Gagal menghapus dari database: ' + err.message);
   });
   if(editingId === id) resetForm(); // kalau yang lagi diedit dihapus, keluar dari mode edit
+}
+
+// Ganti status langsung dari dropdown di tabel Rekap, tanpa perlu masuk mode edit
+function updateBookingStatus(id, newStatus){
+  bookingsCol.doc(id).update({ status: newStatus }).catch(err => {
+    console.error(err);
+    alert('Gagal mengubah status: ' + err.message);
+  });
 }
 
 function clearSearch(){
@@ -596,6 +599,7 @@ function mapHeaderColumns(headerRow){
   headerRow.forEach((cell, idx) => {
     const t = normalizeHeaderCell(cell);
     if(t === 'WAKTU SESUAI SURAT') map.waktu = idx;
+    else if(t === 'STATUS') map.status = idx;
     else if(t === 'PEMASANGAN') map.pasang = idx;
     else if(t === 'ACARA') map.acara = idx;
     else if(t === 'PEMBONGKARAN') map.bongkar = idx;
@@ -603,8 +607,20 @@ function mapHeaderColumns(headerRow){
     else if(t.indexOf('MENGHADIRI') !== -1) map.pemohon = idx;
     else if(t === 'TEMPAT') map.tempat = idx;
     else if(t.indexOf('NO SURAT') !== -1) map.surat = idx;
+    else if(t === 'ID') map.id = idx;
   });
   return map;
+}
+
+// Normalisasi teks status dari spreadsheet ("selesai", "SELESAI ", dll)
+// jadi salah satu dari 3 nilai baku yang dipakai app. Default ke 'Proses'
+// kalau kosong/tidak dikenali.
+function normalizeStatusCell(v){
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  if(s === 'selesai') return 'Selesai';
+  if(s === 'batal') return 'Batal';
+  if(s === 'proses') return 'Proses';
+  return 'Proses';
 }
 
 function looksLikeHeaderRow(row){
@@ -612,26 +628,57 @@ function looksLikeHeaderRow(row){
   return norm.includes('NO') && norm.some(t => t.indexOf('KEGIATAN') !== -1) && norm.some(t => t === 'PEMASANGAN' || t === 'ACARA');
 }
 
-// Parse baris pita tanggal, misal "Sabtu ,6 Juni 2026" jadi ISO YYYY-MM-DD.
-// Toleran terhadap spasi/koma yang tidak konsisten. Return null kalau
-// tidak cocok pola sama sekali (dianggap bukan pita tanggal).
+// Singkatan bulan yang umum dipakai di file agenda (mis. template baru
+// pakai "Sept", "Ags", dst, bukan nama bulan lengkap). Dipetakan manual
+// untuk kasus yang tidak sekadar "3 huruf pertama" (Mei tetap "Mei",
+// Agustus punya beberapa varian singkatan, dst).
+const MONTH_ABBR_ID = {
+  jan: 0, feb: 1, mar: 2, apr: 3, mei: 4, jun: 5,
+  jul: 6, agu: 7, ags: 7, agt: 7, sep: 8, sept: 8,
+  okt: 9, nov: 10, des: 11
+};
+
+// Cari index bulan (0-11) dari teks nama bulan, toleran terhadap nama
+// lengkap ("September"), singkatan umum ("Sept", "Ags"), atau singkatan
+// 3-huruf generik lain yang belum ada di daftar manual di atas.
+function monthIndexFromName(monthName){
+  const s = String(monthName || '').trim().toLowerCase();
+  if(!s) return -1;
+  let idx = MONTH_NAMES_FULL_ID.findIndex(mn => mn.toLowerCase() === s);
+  if(idx !== -1) return idx;
+  if(Object.prototype.hasOwnProperty.call(MONTH_ABBR_ID, s)) return MONTH_ABBR_ID[s];
+  const s3 = s.slice(0, 3);
+  idx = MONTH_NAMES_FULL_ID.findIndex(mn => mn.toLowerCase().slice(0, 3) === s3);
+  return idx;
+}
+
+// Parse baris pita tanggal, misal "Sabtu ,6 Juni 2026" atau "Selasa ,1 Sept 2026"
+// jadi ISO YYYY-MM-DD. Toleran terhadap spasi/koma yang tidak konsisten dan
+// nama bulan singkatan. Return null kalau tidak cocok pola sama sekali
+// (dianggap bukan pita tanggal).
 function parseDayBandLabel(cellValue){
   const s = String(cellValue == null ? '' : cellValue).trim();
   if(!s) return null;
   const m = s.match(/(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})/);
   if(!m) return null;
   const day = parseInt(m[1], 10);
-  const monthName = m[2].toLowerCase();
   const year = parseInt(m[3], 10);
-  const monthIdx = MONTH_NAMES_FULL_ID.findIndex(mn => mn.toLowerCase() === monthName);
+  const monthIdx = monthIndexFromName(m[2]);
   if(monthIdx === -1 || !day || !year) return null;
   const mm = String(monthIdx + 1).padStart(2, '0');
   const dd = String(day).padStart(2, '0');
   return `${year}-${mm}-${dd}`;
 }
 
+// Simbol yang dianggap "centang" di kolom Pemasangan/Acara/Pembongkaran.
+// '√' (U+221A, root sign) dipakai di file agenda; ✓/✔/☑ ditambahkan
+// sebagai variasi visual yang mungkin dipakai di file lain. Isi sel selain
+// simbol-simbol ini (kosong, "-", "x", catatan bebas, dll) TIDAK dianggap
+// tercentang, supaya tidak salah kebaca kalau ada isian lain di kolom itu.
+const CHECK_MARK_SYMBOLS = ['√', '✓', '✔', '☑'];
 function cellHasMark(v){
-  return String(v == null ? '' : v).trim() !== '';
+  const s = String(v == null ? '' : v).trim();
+  return CHECK_MARK_SYMBOLS.includes(s);
 }
 
 function normalizeWaktuCell(v){
@@ -683,6 +730,7 @@ function parseHistorisRows(rows){
     results.push({
       date: currentDate,
       time: colMap.waktu !== undefined ? normalizeWaktuCell(row[colMap.waktu]) : '',
+      status: colMap.status !== undefined ? normalizeStatusCell(row[colMap.status]) : 'Proses',
       pemohon: colMap.pemohon !== undefined ? String(row[colMap.pemohon] || '').trim() : '',
       acara: kegiatan,
       tempat: colMap.tempat !== undefined ? String(row[colMap.tempat] || '').trim() : '',
@@ -690,7 +738,8 @@ function parseHistorisRows(rows){
       suratmasuk: '',
       actPasang: colMap.pasang !== undefined ? cellHasMark(row[colMap.pasang]) : false,
       actAcara: colMap.acara !== undefined ? cellHasMark(row[colMap.acara]) : false,
-      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false
+      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false,
+      id: colMap.id !== undefined ? String(row[colMap.id] || '').trim() : ''
     });
   }
   return results;
@@ -811,44 +860,64 @@ async function importParsedBookings(parsedList){
   }
 }
 
+function argb(hex){ return 'FF' + hex; } // ExcelJS pakai ARGB (8 digit), tambahkan alpha penuh
+
+// Font default untuk seluruh export: Arial. Judul & sub-judul (bulan) pakai
+// ukuran/berat sendiri, sisanya (header kolom, pita tanggal, isi sel, status,
+// centang) seragam Arial 12 regular.
+const EXPORT_FONT_NAME = 'Arial';
+
 function styleTitle(){
-  return { font: { bold: true, sz: 16 }, alignment: { horizontal: 'center', vertical: 'center' } };
+  return { font: { name: EXPORT_FONT_NAME, bold: true, size: 19 }, alignment: { horizontal: 'center', vertical: 'middle' } };
 }
 function styleSubtitle(){
-  return { font: { bold: true, sz: 12 }, alignment: { horizontal: 'center', vertical: 'center' } };
+  return { font: { name: EXPORT_FONT_NAME, bold: true, size: 13 }, alignment: { horizontal: 'center', vertical: 'middle' } };
 }
 function styleDayBand(){
   return {
-    font: { bold: true, sz: 11, color: { rgb: '000000' } },
-    fill: { fgColor: { rgb: 'EA9999' } }, // Warna Merah Muda / Pink
-    alignment: { horizontal: 'left', vertical: 'center' },
-    border: borderThin()
+    font: { name: EXPORT_FONT_NAME, bold: false, size: 12, color: { argb: argb('000000') } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: argb('DD7E6B') } }, // Salmon
+    alignment: { horizontal: 'left', vertical: 'middle' }
   };
 }
 function styleHeader(){
   return {
-    font: { bold: true, sz: 10 },
-    fill: { fgColor: { rgb: 'F6B26B' } }, // Warna Oranye
-    alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    font: { name: EXPORT_FONT_NAME, bold: false, size: 12, color: { argb: argb('000000') } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: argb('FBBC04') } }, // Gold
+    alignment: { horizontal: 'center', vertical: 'middle', wrapText: true },
     border: borderThin()
   };
 }
 function styleCell(align){
   return {
-    font: { sz: 10 },
-    alignment: { horizontal: align || 'left', vertical: 'center', wrapText: true },
+    font: { name: EXPORT_FONT_NAME, bold: false, size: 12 },
+    alignment: { horizontal: align || 'left', vertical: 'middle', wrapText: true },
     border: borderThin()
   };
 }
 function styleCheck(){
   return {
-    font: { sz: 13, bold: true, color: { rgb: '2E7D32' } }, // hijau tebal buat centang
-    alignment: { horizontal: 'center', vertical: 'center' },
+    font: { name: EXPORT_FONT_NAME, size: 12, bold: false, color: { argb: argb('2E7D32') } }, // hijau buat centang
+    alignment: { horizontal: 'center', vertical: 'middle' },
+    border: borderThin()
+  };
+}
+function styleStatus(statusValue){
+  const map = {
+    'Selesai': { fill: '3A6B4A', font: 'FFFFFF' },
+    'Proses':  { fill: 'C8862B', font: 'FFFFFF' },
+    'Batal':   { fill: 'A5342A', font: 'FFFFFF' }
+  };
+  const c = map[statusValue] || map['Proses'];
+  return {
+    font: { name: EXPORT_FONT_NAME, size: 12, bold: false, color: { argb: argb(c.font) } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: argb(c.fill) } },
+    alignment: { horizontal: 'center', vertical: 'middle' },
     border: borderThin()
   };
 }
 function borderThin(){
-  const b = { style: 'thin', color: { rgb: '000000' } }; // Diubah jadi Hitam Pekat
+  const b = { style: 'thin', color: { argb: argb('000000') } };
   return { top: b, bottom: b, left: b, right: b };
 }
 
@@ -860,8 +929,8 @@ function borderThin(){
 function buildAgendaData(bookingSubset, opts){
   opts = opts || {};
   const sourceBookings = bookingSubset || bookings;
-  const COLS = 9; // Kolom A sampai I (Sesuai foto)
-  const headerLabels = ['NO','WAKTU SESUAI SURAT','PEMASANGAN','ACARA','PEMBONGKARAN','KEGIATAN / ACARA','YANG MENGHADIRI','TEMPAT','NO SURAT'];
+  const COLS = 10; // Kolom A sampai J (sesuai template baru, ada tambahan STATUS)
+  const headerLabels = ['NO','WAKTU SESUAI SURAT','STATUS','PEMASANGAN','ACARA','PEMBONGKARAN','KEGIATAN /  ACARA','YANG MENGHADIRI','TEMPAT','NO SURAT'];
 
   // Kelompokkan booking per tanggal
   const byDate = {};
@@ -905,6 +974,11 @@ function buildAgendaData(bookingSubset, opts){
   const rowHeights = [];
   const rowTypes = [];     // 'title' | 'subtitle' | 'stat' | 'blank' | 'header' | 'dayband' | 'data'
   const dataRowAligns = []; // per-row array of 'center'/'left' per column (only for 'data' rows)
+  // ID booking Firestore per baris (cuma diisi untuk baris 'data'; dipakai
+  // sebagai kolom tersembunyi di Google Sheets supaya status yang diedit di
+  // sana bisa disinkron balik ke booking yang tepat, bukan cuma dicocokkan
+  // dari tanggal/waktu/nama acara yang bisa berubah/mirip).
+  const rowIds = [];
 
   function pushRow(rowArr, type, heightOpts = {}){
     aoa.push(rowArr);
@@ -936,16 +1010,17 @@ function buildAgendaData(bookingSubset, opts){
   // 3. Spasi Kosong Sebelum Mulai Data
   pushRow(Array(COLS).fill(''), 'blank', { hpt: 15 });
 
-  dates.forEach((date, dateIdx) => {
+  // 4. Baris Header (Warna Gold) - CUMA SEKALI di atas, tidak diulang tiap hari
+  const headerRowIdxForId = pushRow(headerLabels.slice(), 'header', { hpt: 35 });
+  rowIds[headerRowIdxForId] = 'ID';
+
+  dates.forEach((date) => {
     const items = byDate[date];
     const d = new Date(date + 'T00:00:00');
     // Format: "Sabtu ,6 Juni 2026" (mempertahankan spasi sebelum koma seperti foto)
     const dayLabel = `${DAY_NAMES_ID[d.getDay()]} ,${d.getDate()} ${MONTH_NAMES_FULL_ID[d.getMonth()]} ${d.getFullYear()}`;
 
-    // 4. Baris Header (Warna Oranye - diulang tiap hari)
-    pushRow(headerLabels.slice(), 'header', { hpt: 35 });
-
-    // 5. Pita Nama Hari (Warna Pink)
+    // 5. Pita Nama Hari (Warna Salmon) - langsung nempel, tanpa spasi/header ulang
     let br = pushRow([dayLabel, ...Array(COLS-1).fill('')], 'dayband', { hpt: 22 });
     merges.push({ s:{r:br, c:0}, e:{r:br, c:COLS-1} });
 
@@ -954,6 +1029,7 @@ function buildAgendaData(bookingSubset, opts){
       const row = [
         idx + 1,
         b.time ? b.time.replace(':', '.') : '',
+        b.status || 'Proses',
         b.actPasang !== false ? '✓' : '', // PEMASANGAN (simbol centang asli)
         b.actAcara !== false ? '✓' : '',  // ACARA
         b.actBongkar !== false ? '✓' : '', // PEMBONGKARAN
@@ -963,75 +1039,105 @@ function buildAgendaData(bookingSubset, opts){
         b.surat || b.suratmasuk || ''
       ];
       const dr = pushRow(row, 'data', { hpt: 20 });
-      dataRowAligns[dr] = row.map((_, c) => (c >= 0 && c <= 4) ? 'center' : 'left');
+      dataRowAligns[dr] = row.map((_, c) => (c >= 0 && c <= 5) ? 'center' : 'left');
+      rowIds[dr] = b.id || '';
     });
-
-    // 7. Spasi Jeda 2 Baris untuk grup hari berikutnya (seperti di foto)
-    if (dateIdx < dates.length - 1) {
-      pushRow(Array(COLS).fill(''), 'blank', { hpt: 15 });
-      pushRow(Array(COLS).fill(''), 'blank', { hpt: 15 });
-    }
   });
 
-  return { COLS, aoa, merges, rowHeights, rowTypes, dataRowAligns, bulanLabel, dates };
+  return { COLS, aoa, merges, rowHeights, rowTypes, dataRowAligns, rowIds, bulanLabel, dates };
 }
 
 function styleStat(){
   return {
-    font: { sz: 10, italic: true, color: { rgb: '5A5348' } },
-    alignment: { horizontal: 'center', vertical: 'center' }
+    font: { name: EXPORT_FONT_NAME, size: 12, bold: false, color: { argb: argb('5A5348') } },
+    alignment: { horizontal: 'center', vertical: 'middle' }
   };
 }
 
-function writeAgendaWorkbook(data, filename, sheetName){
-  const { COLS, aoa, merges, rowHeights, rowTypes, dataRowAligns } = data;
-  const cellStyles = {};
-  function setStyle(r, c, style){ cellStyles[`${r},${c}`] = style; }
+function applyCellStyle(cell, style){
+  if(style.font) cell.font = style.font;
+  if(style.alignment) cell.alignment = style.alignment;
+  if(style.fill) cell.fill = style.fill;
+  if(style.border) cell.border = style.border;
+}
 
-  rowTypes.forEach((type, r) => {
+async function writeAgendaWorkbook(data, filename, sheetName){
+  const { COLS, aoa, merges, rowHeights, rowTypes, dataRowAligns } = data;
+
+  const workbook = new ExcelJS.Workbook();
+  const ws = workbook.addWorksheet(sheetName || 'Agenda Sound System');
+
+  // Bekukan baris judul/bulan/(stat)/header supaya tetap kelihatan saat
+  // scroll ke bawah. Dihitung dari posisi baris 'header' (bukan angka
+  // tetap 4), karena laporan bulanan (showStats) punya 1 baris statistik
+  // tambahan sebelum header, jadi headernya jatuh di baris 5, bukan 4.
+  const headerRowIdx = rowTypes.indexOf('header'); // 0-based
+  if(headerRowIdx !== -1){
+    ws.views = [{ state: 'frozen', xSplit: 0, ySplit: headerRowIdx + 1 }];
+  }
+
+  ws.columns = [
+    {width: 5},   // A: NO
+    {width: 14},  // B: WAKTU SESUAI SURAT
+    {width: 12},  // C: STATUS
+    {width: 13},  // D: PEMASANGAN
+    {width: 9},   // E: ACARA
+    {width: 16},  // F: PEMBONGKARAN
+    {width: 45},  // G: KEGIATAN / ACARA
+    {width: 18},  // H: YANG MENGHADIRI
+    {width: 32},  // I: TEMPAT
+    {width: 28}   // J: NO SURAT
+  ];
+
+  aoa.forEach((rowArr, r) => {
+    const row = ws.addRow(rowArr);
+    if(rowHeights[r] && rowHeights[r].hpt) row.height = rowHeights[r].hpt;
+
+    const type = rowTypes[r];
     if(type === 'title'){
-      setStyle(r, 0, styleTitle());
+      applyCellStyle(row.getCell(1), styleTitle());
     }else if(type === 'subtitle'){
-      setStyle(r, 0, styleSubtitle());
+      applyCellStyle(row.getCell(1), styleSubtitle());
     }else if(type === 'stat'){
-      setStyle(r, 0, styleStat());
+      applyCellStyle(row.getCell(1), styleStat());
     }else if(type === 'header'){
-      for(let c=0; c<COLS; c++) setStyle(r, c, styleHeader());
+      for(let c = 1; c <= COLS; c++) applyCellStyle(row.getCell(c), styleHeader());
     }else if(type === 'dayband'){
-      for(let c=0; c<COLS; c++) setStyle(r, c, styleDayBand());
+      for(let c = 1; c <= COLS; c++) applyCellStyle(row.getCell(c), styleDayBand());
     }else if(type === 'data'){
-      dataRowAligns[r].forEach((align, c) => {
-        const style = (c === 2 || c === 3 || c === 4) ? styleCheck() : styleCell(align);
-        setStyle(r, c, style);
+      dataRowAligns[r].forEach((align, c0) => {
+        const cell = row.getCell(c0 + 1);
+        if(c0 === 2){
+          applyCellStyle(cell, styleStatus(aoa[r][2]));
+          // Dropdown Status asli di Excel (Selesai/Proses/Batal)
+          cell.dataValidation = {
+            type: 'list',
+            allowBlank: true,
+            formulae: ['"Selesai,Proses,Batal"']
+          };
+        }else if(c0 === 3 || c0 === 4 || c0 === 5){
+          applyCellStyle(cell, styleCheck());
+        }else{
+          applyCellStyle(cell, styleCell(align));
+        }
       });
     }
   });
 
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws['!merges'] = merges;
-  ws['!rows'] = rowHeights;
-  ws['!cols'] = [
-    {wch: 4},   // A: NO
-    {wch: 11},  // B: WAKTU SESUAI SURAT
-    {wch: 13},  // C: PEMASANGAN
-    {wch: 9},   // D: ACARA
-    {wch: 16},  // E: PEMBONGKARAN
-    {wch: 45},  // F: KEGIATAN / ACARA
-    {wch: 18},  // G: YANG MENGHADIRI
-    {wch: 35},  // H: TEMPAT
-    {wch: 28}   // I: NO SURAT
-  ];
-
-  Object.keys(cellStyles).forEach(key => {
-    const [rr, cc] = key.split(',').map(Number);
-    const addr = XLSX.utils.encode_cell({ r: rr, c: cc });
-    if(!ws[addr]) ws[addr] = { t: 's', v: '' };
-    ws[addr].s = cellStyles[key];
+  merges.forEach(m => {
+    ws.mergeCells(m.s.r + 1, m.s.c + 1, m.e.r + 1, m.e.c + 1);
   });
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, sheetName || 'Agenda Sound System');
-  XLSX.writeFile(wb, filename);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 let pendingExportType = null; // 'excel' atau 'gsheets', dipakai modal pilihan export
@@ -1105,7 +1211,7 @@ function confirmExport(){
   }
 }
 
-function exportToExcel(subset){
+async function exportToExcel(subset){
   const source = subset || bookings;
   if(source.length === 0){
     alert('Belum ada data untuk di-export.');
@@ -1113,10 +1219,10 @@ function exportToExcel(subset){
   }
   const data = buildAgendaData(source);
   const today = new Date().toISOString().slice(0,10);
-  writeAgendaWorkbook(data, `agenda-sound-system-${today}.xlsx`, 'Agenda Sound System');
+  await writeAgendaWorkbook(data, `agenda-sound-system-${today}.xlsx`, 'Agenda Sound System');
 }
 
-function exportMonthReport(ym){
+async function exportMonthReport(ym){
   const monthBookings = bookings.filter(b => b.date.slice(0,7) === ym);
   if(monthBookings.length === 0){
     alert('Tidak ada data di bulan ini untuk di-export.');
@@ -1131,7 +1237,7 @@ function exportMonthReport(ym){
     showStats: true
   });
   const filename = `laporan-bulanan-sound-system-${ym}.xlsx`;
-  writeAgendaWorkbook(data, filename, monthLabel);
+  await writeAgendaWorkbook(data, filename, monthLabel);
 }
 
 /* ============================================================
@@ -1190,20 +1296,23 @@ async function createAndFillGoogleSheet(subset){
     const spreadsheetId = createResp.result.spreadsheetId;
     const sheetId = createResp.result.sheets[0].properties.sheetId;
 
-    // 2. Isi nilai sel
+    // 2. Isi nilai sel (kolom A-J data yang tampil, ditambah kolom K
+    // berisi ID booking per baris - dipakai nanti untuk fitur Sync Status,
+    // disembunyikan supaya tidak mengganggu tampilan)
+    const valuesWithId = data.aoa.map((row, i) => [...row, (data.rowIds && data.rowIds[i]) || '']);
     await gapi.client.sheets.spreadsheets.values.update({
       spreadsheetId,
       range: 'Agenda Sound System!A1',
       valueInputOption: 'RAW',
-      resource: { values: data.aoa }
+      resource: { values: valuesWithId }
     });
 
     // 3. Format: merge, warna, border, lebar kolom, tinggi baris
     const requests = [];
     const COLS = data.COLS;
 
-    // Lebar kolom
-    const colWidths = [40,90,100,100,100,500,170,350,350];
+    // Lebar kolom (10 kolom: NO, WAKTU, STATUS, PEMASANGAN, ACARA, PEMBONGKARAN, KEGIATAN, YANG MENGHADIRI, TEMPAT, NO SURAT)
+    const colWidths = [40,100,90,100,90,110,500,170,300,300];
     colWidths.forEach((w, c) => {
       requests.push({
         updateDimensionProperties: {
@@ -1213,6 +1322,27 @@ async function createAndFillGoogleSheet(subset){
         }
       });
     });
+
+    // Kolom K (index 10) = ID booking, disembunyikan karena cuma dipakai
+    // internal untuk fitur Sync Status dari Google Sheets.
+    requests.push({
+      updateDimensionProperties: {
+        range: { sheetId, dimension: 'COLUMNS', startIndex: 10, endIndex: 11 },
+        properties: { hiddenByUser: true },
+        fields: 'hiddenByUser'
+      }
+    });
+
+    // Bekukan baris judul/bulan/(stat)/header, konsisten dengan export Excel
+    const headerRowIdxG = data.rowTypes.indexOf('header');
+    if(headerRowIdxG !== -1){
+      requests.push({
+        updateSheetProperties: {
+          properties: { sheetId, gridProperties: { frozenRowCount: headerRowIdxG + 1 } },
+          fields: 'gridProperties.frozenRowCount'
+        }
+      });
+    }
 
     // Merge judul, subjudul, dan pita hari
     data.merges.forEach(m => {
@@ -1224,10 +1354,49 @@ async function createAndFillGoogleSheet(subset){
       });
     });
 
-    const orange = rgbToGoogleColor('F6B26B');
-    const pink = rgbToGoogleColor('EA9999');
+    const gold = rgbToGoogleColor('FBBC04');
+    const salmon = rgbToGoogleColor('DD7E6B');
+    const statusColors = {
+      'Selesai': rgbToGoogleColor('3A6B4A'),
+      'Proses': rgbToGoogleColor('C8862B'),
+      'Batal': rgbToGoogleColor('A5342A')
+    };
     const border = { style: 'SOLID', color: { red:0, green:0, blue:0 } };
     const thinBorders = { top: border, bottom: border, left: border, right: border };
+
+
+const statusDataRows = [];
+    data.rowTypes.forEach((type, r) => {
+      if(type === 'data') statusDataRows.push(r);
+    });
+
+    if(statusDataRows.length > 0){
+      const minRow = Math.min(...statusDataRows);
+      const maxRow = Math.max(...statusDataRows);
+      requests.push({
+        setDataValidation: {
+          range: {
+            sheetId: sheetId,
+            startRowIndex: minRow,
+            endRowIndex: maxRow + 1,
+            startColumnIndex: 2, // Kolom C (Status)
+            endColumnIndex: 3
+          },
+          rule: {
+            condition: {
+              type: 'ONE_OF_LIST',
+              values: [
+                { userEnteredValue: 'Selesai' },
+                { userEnteredValue: 'Proses' },
+                { userEnteredValue: 'Batal' }
+              ]
+            },
+            showCustomUi: true,
+            strict: true
+          }
+        }
+      });
+    }
 
     data.rowTypes.forEach((type, r) => {
       if(type === 'title'){
@@ -1247,7 +1416,7 @@ async function createAndFillGoogleSheet(subset){
           range: { sheetId, startRowIndex:r, endRowIndex:r+1, startColumnIndex:0, endColumnIndex:COLS },
           cell: { userEnteredFormat: {
             textFormat: { bold:true, fontSize:10 },
-            backgroundColor: orange,
+            backgroundColor: gold,
             horizontalAlignment:'CENTER', verticalAlignment:'MIDDLE', wrapStrategy:'WRAP',
             borders: thinBorders
           } },
@@ -1258,26 +1427,33 @@ async function createAndFillGoogleSheet(subset){
           range: { sheetId, startRowIndex:r, endRowIndex:r+1, startColumnIndex:0, endColumnIndex:COLS },
           cell: { userEnteredFormat: {
             textFormat: { bold:true, fontSize:11 },
-            backgroundColor: pink,
-            horizontalAlignment:'LEFT', verticalAlignment:'MIDDLE',
-            borders: thinBorders
+            backgroundColor: salmon,
+            horizontalAlignment:'LEFT', verticalAlignment:'MIDDLE'
           } },
-          fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,borders)'
+          fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment)'
         }});
       }else if(type === 'data'){
         data.dataRowAligns[r].forEach((align, c) => {
-          const isCheckCol = (c === 2 || c === 3 || c === 4);
+          const isCheckCol = (c === 3 || c === 4 || c === 5);
+          const isStatusCol = (c === 2);
+          const cellFormat = {
+            textFormat: isCheckCol
+              ? { fontSize:13, bold:true, foregroundColor:{ red:0.18, green:0.49, blue:0.20 } }
+              : isStatusCol
+                ? { fontSize:10, bold:true, foregroundColor:{ red:1, green:1, blue:1 } }
+                : { fontSize:10 },
+            horizontalAlignment: (isCheckCol || isStatusCol || align === 'center') ? 'CENTER' : 'LEFT',
+            verticalAlignment:'MIDDLE', wrapStrategy:'WRAP',
+            borders: thinBorders
+          };
+          if(isStatusCol){
+            const statusVal = data.aoa[r][2];
+            cellFormat.backgroundColor = statusColors[statusVal] || statusColors['Proses'];
+          }
           requests.push({ repeatCell: {
             range: { sheetId, startRowIndex:r, endRowIndex:r+1, startColumnIndex:c, endColumnIndex:c+1 },
-            cell: { userEnteredFormat: {
-              textFormat: isCheckCol
-                ? { fontSize:13, bold:true, foregroundColor:{ red:0.18, green:0.49, blue:0.20 } }
-                : { fontSize:10 },
-              horizontalAlignment: (isCheckCol || align === 'center') ? 'CENTER' : 'LEFT',
-              verticalAlignment:'MIDDLE', wrapStrategy:'WRAP',
-              borders: thinBorders
-            } },
-            fields: 'userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment,wrapStrategy,borders)'
+            cell: { userEnteredFormat: cellFormat },
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy,borders)'
           }});
         });
       }
@@ -1307,6 +1483,90 @@ async function createAndFillGoogleSheet(subset){
   }finally{
     btn.disabled = false;
     btn.textContent = originalLabel;
+  }
+}
+
+/* ============================================================
+   SYNC STATUS DARI GOOGLE SHEETS
+   Baca ulang spreadsheet hasil export (yang sudah punya kolom ID
+   tersembunyi di kolom K), lalu perbarui field status di Firestore
+   untuk booking yang statusnya sudah diubah manual di Sheets.
+   Data/baris lain (tanggal, kegiatan, dst) tidak disentuh sama sekali,
+   dan baris yang ID-nya tidak ditemukan (booking sudah dihapus, atau
+   sheet bukan hasil export aplikasi ini) dilewati dengan aman.
+   ============================================================ */
+function openSyncStatusModal(){
+  document.getElementById('sync-gsheet-link').value = '';
+  const statusLine = document.getElementById('sync-status-line');
+  statusLine.textContent = '';
+  statusLine.style.color = 'var(--ink)';
+  document.getElementById('sync-status-modal-overlay').style.display = 'flex';
+}
+
+function closeSyncStatusModal(){
+  document.getElementById('sync-status-modal-overlay').style.display = 'none';
+}
+
+function confirmSyncStatus(){
+  syncStatusFromGoogleSheets();
+}
+
+async function syncStatusFromGoogleSheets(){
+  const url = document.getElementById('sync-gsheet-link').value.trim();
+  const statusLine = document.getElementById('sync-status-line');
+  const spreadsheetId = extractSpreadsheetId(url);
+
+  if(!spreadsheetId){
+    statusLine.style.color = 'var(--full)';
+    statusLine.textContent = 'Link tidak valid. Pastikan formatnya seperti https://docs.google.com/spreadsheets/d/.../edit';
+    return;
+  }
+
+  statusLine.style.color = 'var(--ink)';
+  statusLine.textContent = 'Menghubungkan ke Google...';
+
+  try{
+    await requestGoogleAccess();
+    statusLine.textContent = 'Membaca isi spreadsheet...';
+
+    const meta = await gapi.client.sheets.spreadsheets.get({ spreadsheetId });
+    const sheetTitles = meta.result.sheets.map(s => s.properties.title);
+
+    let updated = 0, unchanged = 0, unmatched = 0, noId = 0;
+
+    for(const title of sheetTitles){
+      const resp = await gapi.client.sheets.spreadsheets.values.get({
+        spreadsheetId,
+        range: `'${title.replace(/'/g, "''")}'`
+      });
+      const parsed = parseHistorisRows(resp.result.values || []);
+
+      for(const item of parsed){
+        if(!item.id){ noId++; continue; } // bukan hasil export aplikasi ini / kolom ID kosong
+        const b = bookings.find(bk => bk.id === item.id);
+        if(!b){ unmatched++; continue; } // booking-nya sudah dihapus dari database
+        if((b.status || 'Proses') === item.status){ unchanged++; continue; }
+        await bookingsCol.doc(item.id).update({ status: item.status });
+        updated++;
+      }
+    }
+
+    closeSyncStatusModal();
+
+    if(noId === 0 && updated === 0 && unchanged === 0 && unmatched === 0){
+      alert('Tidak ada data yang bisa dibaca dari spreadsheet ini.');
+      return;
+    }
+    if(updated === 0 && unchanged === 0 && unmatched === 0){
+      alert('Spreadsheet ini sepertinya bukan hasil export dari aplikasi ini (kolom ID tersembunyi tidak ditemukan), jadi tidak ada yang bisa disinkron.');
+      return;
+    }
+
+    alert(`Sync status selesai.\nDiperbarui: ${updated}\nSudah sama (tidak ada perubahan): ${unchanged}\nTidak ditemukan (mungkin sudah dihapus): ${unmatched}`);
+  }catch(err){
+    console.error(err);
+    statusLine.style.color = 'var(--full)';
+    statusLine.textContent = 'Gagal sync: ' + (err.result?.error?.message || err.message || err);
   }
 }
 
@@ -1417,7 +1677,7 @@ function renderTable(){
   });
   const months = Object.keys(byMonth).sort().reverse(); // bulan terbaru di atas
 
-  let html = '<div class="rekap-scroll"><table><thead><tr><th>Tanggal / Jumlah</th><th>Waktu</th><th>Kegiatan</th><th>Yang Menghadiri</th><th>Tempat</th><th>No. e-Surat</th><th>No. Surat Balasan</th><th></th></tr></thead><tbody>';
+  let html = '<div class="rekap-scroll"><table><thead><tr><th>Tanggal / Jumlah</th><th>Waktu</th><th>Status</th><th>Kegiatan</th><th>Yang Menghadiri</th><th>Tempat</th><th>No. e-Surat</th><th>No. Surat Balasan</th><th></th></tr></thead><tbody>';
 
   months.forEach(ym => {
     const [y, m] = ym.split('-');
@@ -1427,7 +1687,7 @@ function renderTable(){
     const isOpen = expandedMonths.has(ym);
 
     html += `<tr class="month-row ${isOpen ? 'month-row-open' : ''}" id="month-row-${ym}" onclick="toggleMonth('${ym}')">
-      <td colspan="8">
+      <td colspan="9">
         <span class="month-toggle-icon">${isOpen ? '\u25BC' : '\u25B6'}</span>
         <span class="month-label">${monthLabel}</span>
         <span class="month-count">${totalInMonth} kegiatan</span>
@@ -1439,14 +1699,22 @@ function renderTable(){
       datesInMonth.forEach(date => {
         const items = byMonth[ym][date];
         const full = items.length >= LIMIT_PER_DAY;
-        html += `<tr><td colspan="8" style="background:#f6f4ee;padding:8px 10px;">
+        html += `<tr><td colspan="9" style="background:#f6f4ee;padding:8px 10px;">
           <span class="datebadge">${fmtDateID(date)}</span>
           <span class="${full ? 'count-full' : 'count-ok'}">${items.length}/${LIMIT_PER_DAY} ${full ? '(PENUH)' : ''}</span>
         </td></tr>`;
         items.forEach(b => {
+          const status = b.status || 'Proses';
           html += `<tr>
             <td></td>
             <td>${b.time || '-'}</td>
+            <td>
+              <select class="status-select status-${status}" onchange="event.stopPropagation(); updateBookingStatus('${b.id}', this.value)" onclick="event.stopPropagation()">
+                <option value="Proses" ${status === 'Proses' ? 'selected' : ''}>Proses</option>
+                <option value="Selesai" ${status === 'Selesai' ? 'selected' : ''}>Selesai</option>
+                <option value="Batal" ${status === 'Batal' ? 'selected' : ''}>Batal</option>
+              </select>
+            </td>
             <td>${escapeHtml(b.acara)}</td>
             <td>${escapeHtml(b.pemohon) || '-'}</td>
             <td>${escapeHtml(b.tempat) || '-'}</td>
