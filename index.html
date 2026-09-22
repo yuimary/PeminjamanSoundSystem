@@ -5,6 +5,7 @@
 <title>Peminjaman Sound System</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <script src="https://apis.google.com/js/api.js"></script>
 <script src="https://accounts.google.com/gsi/client"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js"></script>
@@ -91,6 +92,13 @@
           <label for="f-acara">Kegiatan / Acara</label>
           <input type="text" id="f-acara" placeholder="">
 
+          <label for="f-status">Status</label>
+          <select id="f-status">
+            <option value="Proses">Proses</option>
+            <option value="Selesai">Selesai</option>
+            <option value="Batal">Batal</option>
+          </select>
+
           <label>Jenis Kegiatan</label>
           <div class="checkbox-row">
             <label class="checkbox-item"><input type="checkbox" id="f-act-pasang" autocomplete="off"> Pemasangan</label>
@@ -125,7 +133,8 @@
             <button type="button" class="clear-btn" onclick="clearSearch()">Semua Tanggal</button>
             <button type="button" class="clear-btn" onclick="openExportModal('excel')">Excel</button>
             <button type="button" class="clear-btn" id="btn-gsheets" onclick="openExportModal('gsheets')">Google Sheets</button>
-            <button type="button" class="clear-btn" onclick="openImportModal()">Import Data Historis</button>
+            <button type="button" class="clear-btn" onclick="openSyncStatusModal()">Sync Status</button>
+            <button type="button" class="clear-btn" onclick="openImportModal()">Import Data</button>
             <input type="file" id="import-historis-file" accept=".xlsx,.xls" style="display:none;" onchange="handleImportHistorisFile(event)">
           </div>
           <div id="table-wrap"><p class="empty-note">Memuat data&hellip;</p></div>
@@ -205,6 +214,23 @@
   </div>
 </div>
 
-<script src="script.js?v=40"></script>
+<div id="sync-status-modal-overlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>Sync Status dari Google Sheets</h3>
+    <p style="font-size:13px; color:var(--muted); margin:-4px 0 10px;">
+      Tempel link Google Sheets hasil export dari aplikasi ini (tombol "Google Sheets" di atas).
+      Status yang sudah kamu ubah di sana akan diperbarui ke Rekap Peminjaman. Data/kolom lain tidak ikut diubah.
+    </p>
+    <input type="text" id="sync-gsheet-link" placeholder="Tempel link Google Sheets di sini">
+    <div id="sync-status-line" class="import-status-line"></div>
+
+    <div class="modal-actions">
+      <button type="button" class="clear-btn" onclick="closeSyncStatusModal()">Batal</button>
+      <button type="button" onclick="confirmSyncStatus()">Sync</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js?v=52"></script>
 </body>
 </html>
