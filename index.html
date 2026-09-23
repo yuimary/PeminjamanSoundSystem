@@ -72,6 +72,13 @@
       <div id="view-catat" class="view" style="display:none;">
         <div class="panel">
           <h2>Catat Peminjaman Baru</h2>
+
+          <div class="pdf-upload-box">
+            <label for="f-pdf-surat" class="pdf-upload-label">📄 Upload Surat (PDF) &mdash; isi form otomatis</label>
+            <input type="file" id="f-pdf-surat" accept="application/pdf" onchange="handleSuratPdfUpload(event)">
+            <div id="pdf-upload-status" class="pdf-upload-status"></div>
+          </div>
+
           <label for="f-suratmasuk">No.Surat Masuk</label>
           <input type="text" id="f-suratmasuk" placeholder="">
           <label for="f-date">Tanggal Kegiatan</label>
@@ -231,6 +238,6 @@
   </div>
 </div>
 
-<script src="script.js?v=52"></script>
+<script src="script.js?v=54"></script>
 </body>
 </html>
