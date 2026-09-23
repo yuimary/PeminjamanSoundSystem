@@ -86,7 +86,7 @@ auth.onAuthStateChanged(user => {
 function startBookingsListener(){
   if(bookingsUnsubscribe) return; // sudah jalan, jangan dobel
   bookingsUnsubscribe = bookingsCol.onSnapshot(async snapshot => {
-    bookings = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    bookings = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
 
     if(bookings.length === 0 && !migrationChecked){
       migrationChecked = true;
@@ -487,7 +487,7 @@ function fillFormFromExtractedSurat(d){
   if(d.pemohon) document.getElementById('f-pemohon').value = d.pemohon;
   if(d.acara) document.getElementById('f-acara').value = d.acara;
   if(d.tempat) document.getElementById('f-tempat').value = d.tempat;
-  if(d.nomor_surat) document.getElementById('f-suratmasuk').value = d.nomor_surat;
+  if(d.nomor_surat) document.getElementById('f-surat').value = d.nomor_surat;
   checkDateStatus();
 }
 
@@ -811,8 +811,7 @@ function parseHistorisRows(rows){
       suratmasuk: '',
       actPasang: colMap.pasang !== undefined ? cellHasMark(row[colMap.pasang]) : false,
       actAcara: colMap.acara !== undefined ? cellHasMark(row[colMap.acara]) : false,
-      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false,
-      id: colMap.id !== undefined ? String(row[colMap.id] || '').trim() : ''
+      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false
     });
   }
   return results;
