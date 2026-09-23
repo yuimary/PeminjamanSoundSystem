@@ -137,6 +137,31 @@ textarea{resize:vertical;min-height:60px;}
 #status-line.ok{background:#eaf2ec;color:var(--ok);border:1px solid #c3dbc9;}
 #status-line.full{background:#f6e7e4;color:var(--full);border:1px solid #e3bcb4;}
 
+.pdf-upload-box{
+  border:1.5px dashed var(--navy);
+  background:#f3f6fa;
+  border-radius:10px;
+  padding:14px 16px;
+  margin-bottom:18px;
+}
+.pdf-upload-label{
+  display:block;
+  font-weight:600;
+  color:var(--navy);
+  margin-bottom:8px;
+}
+.pdf-upload-box input[type="file"]{
+  width:100%;
+  font-size:13px;
+}
+.pdf-upload-status{
+  margin-top:8px;
+  font-size:13px;
+  color:var(--ink);
+}
+.pdf-upload-status.full{ color:var(--full); }
+.pdf-upload-status.ok{ color:#1e6b3a; }
+
 button{
   margin-top:20px;
   font-family:'Inter',Arial,sans-serif;
