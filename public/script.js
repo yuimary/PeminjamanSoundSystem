@@ -86,7 +86,7 @@ auth.onAuthStateChanged(user => {
 function startBookingsListener(){
   if(bookingsUnsubscribe) return; // sudah jalan, jangan dobel
   bookingsUnsubscribe = bookingsCol.onSnapshot(async snapshot => {
-    bookings = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+    bookings = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
 
     if(bookings.length === 0 && !migrationChecked){
       migrationChecked = true;
@@ -508,7 +508,7 @@ async function handleSuratPdfUpload(event){
 
   try{
     const base64 = await fileToBase64(file);
-    const resp = await fetch('/.netlify/functions/extract-surat', {
+    const resp = await fetch('/api/extract-surat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pdfBase64: base64 })
@@ -811,8 +811,7 @@ function parseHistorisRows(rows){
       suratmasuk: '',
       actPasang: colMap.pasang !== undefined ? cellHasMark(row[colMap.pasang]) : false,
       actAcara: colMap.acara !== undefined ? cellHasMark(row[colMap.acara]) : false,
-      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false,
-      id: colMap.id !== undefined ? String(row[colMap.id] || '').trim() : ''
+      actBongkar: colMap.bongkar !== undefined ? cellHasMark(row[colMap.bongkar]) : false
     });
   }
   return results;
