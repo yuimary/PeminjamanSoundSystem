@@ -12,7 +12,7 @@
 //
 // Endpoint otomatis tersedia di: /.netlify/functions/extract-surat
 
-const GEMINI_MODEL = 'gemini-2.5-flash'; // model gratis, cukup pintar untuk baca surat
+const GEMINI_MODEL = 'gemini-3.6-flash'; // model gratis, cukup pintar untuk baca surat
 
 const SYSTEM_PROMPT = `Kamu adalah asisten admin Diskominfo yang bertugas membaca surat masuk terkait permohonan peminjaman sound system, lalu mengekstrak informasi pentingnya. Surat bisa datang dari instansi, warga, sekolah, atau pihak lain, dengan format dan tata letak yang BERBEDA-BEDA - baca isinya secara menyeluruh, jangan berasumsi dari posisi/layout tertentu saja.
 
