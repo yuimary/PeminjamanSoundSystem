@@ -462,6 +462,79 @@ function startEditBooking(id){
   checkDateStatus();
 }
 
+/* ============================================================
+   UPLOAD SURAT (PDF) -> ISI FORM OTOMATIS
+   File PDF dikirim ke Netlify Function "extract-surat" (yang meneruskan
+   ke Claude API di server, supaya API key tidak pernah kelihatan di
+   browser), lalu hasil ekstraksinya dipakai untuk mengisi form Catat
+   Peminjaman. Data yang terisi HARUS tetap dicek manual oleh pengguna
+   sebelum disimpan - fungsi ini tidak pernah langsung menyimpan ke
+   database sendiri.
+   ============================================================ */
+function fileToBase64(file){
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+    reader.onerror = () => reject(new Error('Gagal membaca file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function fillFormFromExtractedSurat(d){
+  if(!d) return;
+  if(d.tanggal) document.getElementById('f-date').value = d.tanggal;
+  if(d.waktu) document.getElementById('f-time').value = d.waktu;
+  if(d.pemohon) document.getElementById('f-pemohon').value = d.pemohon;
+  if(d.acara) document.getElementById('f-acara').value = d.acara;
+  if(d.tempat) document.getElementById('f-tempat').value = d.tempat;
+  if(d.nomor_surat) document.getElementById('f-surat').value = d.nomor_surat;
+  checkDateStatus();
+}
+
+async function handleSuratPdfUpload(event){
+  const file = event.target.files[0];
+  const statusEl = document.getElementById('pdf-upload-status');
+  if(!file) return;
+
+  if(file.type !== 'application/pdf'){
+    statusEl.className = 'pdf-upload-status full';
+    statusEl.textContent = 'File harus berupa PDF.';
+    event.target.value = '';
+    return;
+  }
+
+  statusEl.className = 'pdf-upload-status';
+  statusEl.textContent = 'Membaca isi surat, mohon tunggu...';
+
+  try{
+    const base64 = await fileToBase64(file);
+    const resp = await fetch('/.netlify/functions/extract-surat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pdfBase64: base64 })
+    });
+    const result = await resp.json().catch(() => ({}));
+
+    if(!resp.ok || !result.ok){
+      throw new Error(result.error || 'Gagal membaca surat.');
+    }
+
+    fillFormFromExtractedSurat(result.data);
+
+    const kosong = Object.entries(result.data || {}).filter(([, v]) => !v).map(([k]) => k);
+    statusEl.className = 'pdf-upload-status ok';
+    statusEl.textContent = kosong.length > 0
+      ? `Data terisi otomatis. Ada beberapa info yang tidak ditemukan di surat (${kosong.join(', ')}) - cek & lengkapi manual sebelum simpan.`
+      : 'Data berhasil diisi otomatis. Tetap cek dulu sebelum klik "Simpan Peminjaman".';
+  }catch(err){
+    console.error(err);
+    statusEl.className = 'pdf-upload-status full';
+    statusEl.textContent = 'Gagal membaca surat: ' + err.message + ' Silakan isi form secara manual.';
+  }finally{
+    event.target.value = '';
+  }
+}
+
 async function submitBooking(){
   const date = document.getElementById('f-date').value;
   const time = document.getElementById('f-time').value;
@@ -1396,6 +1469,34 @@ const statusDataRows = [];
           }
         }
       });
+
+      // Conditional Formatting untuk kolom STATUS: warnanya dihitung ulang
+      // otomatis dari ISI TEKS sel setiap kali berubah (bukan dicat sekali
+      // waktu export), jadi begitu status diganti misalnya dari "Proses"
+      // ke "Batal", warnanya langsung ikut berubah ke merah tanpa perlu
+      // export ulang.
+      const statusConditionalFormats = [
+        { value: 'Selesai', bg: rgbToGoogleColor('3A6B4A') },
+        { value: 'Proses',  bg: rgbToGoogleColor('C8862B') },
+        { value: 'Batal',   bg: rgbToGoogleColor('A5342A') }
+      ];
+      statusConditionalFormats.forEach((cfg, i) => {
+        requests.push({
+          addConditionalFormatRule: {
+            rule: {
+              ranges: [{ sheetId, startRowIndex: minRow, endRowIndex: maxRow + 1, startColumnIndex: 2, endColumnIndex: 3 }],
+              booleanRule: {
+                condition: { type: 'TEXT_EQ', values: [{ userEnteredValue: cfg.value }] },
+                format: {
+                  backgroundColor: cfg.bg,
+                  textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } }
+                }
+              }
+            },
+            index: i
+          }
+        });
+      });
     }
 
     data.rowTypes.forEach((type, r) => {
@@ -1439,17 +1540,11 @@ const statusDataRows = [];
           const cellFormat = {
             textFormat: isCheckCol
               ? { fontSize:13, bold:true, foregroundColor:{ red:0.18, green:0.49, blue:0.20 } }
-              : isStatusCol
-                ? { fontSize:10, bold:true, foregroundColor:{ red:1, green:1, blue:1 } }
-                : { fontSize:10 },
+              : { fontSize:10 },
             horizontalAlignment: (isCheckCol || isStatusCol || align === 'center') ? 'CENTER' : 'LEFT',
             verticalAlignment:'MIDDLE', wrapStrategy:'WRAP',
             borders: thinBorders
           };
-          if(isStatusCol){
-            const statusVal = data.aoa[r][2];
-            cellFormat.backgroundColor = statusColors[statusVal] || statusColors['Proses'];
-          }
           requests.push({ repeatCell: {
             range: { sheetId, startRowIndex:r, endRowIndex:r+1, startColumnIndex:c, endColumnIndex:c+1 },
             cell: { userEnteredFormat: cellFormat },
