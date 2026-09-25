@@ -484,7 +484,7 @@ function fillFormFromExtractedSurat(d){
   if(!d) return;
   if(d.tanggal) document.getElementById('f-date').value = d.tanggal;
   if(d.waktu) document.getElementById('f-time').value = d.waktu;
-  if(d.pemohon) document.getElementById('f-pemohon').value = d.pemohon;
+  document.getElementById('f-pemohon').value = 'Team Sound';
   if(d.acara) document.getElementById('f-acara').value = d.acara;
   if(d.tempat) document.getElementById('f-tempat').value = d.tempat;
   if(d.nomor_surat) document.getElementById('f-surat').value = d.nomor_surat;
