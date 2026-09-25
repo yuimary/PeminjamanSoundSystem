@@ -22,7 +22,6 @@ Kembalikan HANYA sebuah objek JSON (tanpa teks lain, tanpa markdown code fence, 
   "tanggal": "YYYY-MM-DD atau null",
   "waktu": "HH:MM dalam format 24 jam, atau null",
   "acara": "nama kegiatan/acara, atau null",
-  "pemohon": "nama orang/pihak yang mengajukan atau yang akan hadir mewakili, atau null",
   "tempat": "lokasi kegiatan, atau null",
   "nomor_surat": "nomor surat resmi (jika ada), atau null"
 }
